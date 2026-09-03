@@ -248,7 +248,14 @@ async function loadPurchases(participantId: string) {
     setError(error.message)
     setPurchases([])
   } else {
-    setPurchases((data ?? []) as Purchase[])
+    setPurchases(
+  (data ?? []).map((purchase) => ({
+    ...purchase,
+    player: Array.isArray(purchase.player)
+      ? purchase.player[0] ?? null
+      : purchase.player,
+  })) as Purchase[]
+)
   }
 
   setLoadingPurchases(false)

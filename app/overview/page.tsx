@@ -71,7 +71,14 @@ export default function OverviewPage() {
     }
 
     setParticipants(participantsResult.data ?? [])
-    setPurchases((purchasesResult.data ?? []) as Purchase[])
+    setPurchases(
+  (purchasesResult.data ?? []).map((purchase) => ({
+    ...purchase,
+    player: Array.isArray(purchase.player)
+      ? purchase.player[0] ?? null
+      : purchase.player,
+  })) as Purchase[]
+)
     setLoading(false)
   }
 
