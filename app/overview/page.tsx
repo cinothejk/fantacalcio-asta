@@ -29,10 +29,39 @@ export default function OverviewPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [deletingPurchaseId, setDeletingPurchaseId] = useState("")
 
   useEffect(() => {
     loadOverview()
   }, [])
+
+async function deletePurchase(purchaseId: string) {
+const confirmed = window.confirm(
+"Sei sicuro di voler eliminare questo acquisto?"
+)
+
+if (!confirmed) {
+return
+}
+
+setDeletingPurchaseId(purchaseId)
+setError("")
+
+const { error } = await supabase.rpc("delete_purchase", {
+p_purchase_id: purchaseId,
+})
+
+if (error) {
+setError(error.message)
+setDeletingPurchaseId("")
+return
+}
+
+await loadOverview()
+setDeletingPurchaseId("")
+}
+
+
 
   async function loadOverview() {
     setLoading(true)
@@ -602,9 +631,24 @@ export default function OverviewPage() {
 
   </div>
 
-  <p className="shrink-0 font-bold text-gray-900">
+  <div className="flex shrink-0 items-center gap-2">
+  <p className="font-bold text-gray-900">
     {purchase.price}
   </p>
+
+<button
+type="button"
+onClick={() => deletePurchase(purchase.id)}
+disabled={deletingPurchaseId === purchase.id}
+className="rounded-lg bg-white px-2 py-1 text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+title="Elimina acquisto"
+
+>
+
+{deletingPurchaseId === purchase.id ? "..." : "🗑️"}
+
+  </button>
+</div>
 
 </div>
 
