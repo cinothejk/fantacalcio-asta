@@ -20,6 +20,11 @@ href: "/importa",
 label: "Asta",
 href: "/asta",
 },
+{ 
+  label: "Assegna", 
+  href: "/assegna" 
+},
+{ label: "Giocatori", href: "/giocatori" },
 {
 label: "Overview",
 href: "/overview",
