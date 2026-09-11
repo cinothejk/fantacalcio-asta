@@ -1,6 +1,8 @@
+
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 
 type Player = {
@@ -32,6 +34,10 @@ const statusLabels = {
 }
 
 export default function GiocatoriPage() {
+  const searchParams = useSearchParams()
+  const auctionId = searchParams.get("auction")
+
+  const [auctionName, setAuctionName] = useState("")
   const [players, setPlayers] = useState<Player[]>([])
 
   const [search, setSearch] = useState("")
@@ -49,25 +55,70 @@ export default function GiocatoriPage() {
   const [message, setMessage] = useState("")
 
   useEffect(() => {
-    loadPlayers()
-  }, [])
+    if (!auctionId) {
+      setLoading(false)
+      setError("Nessuna asta selezionata.")
+      return
+    }
 
-  async function loadPlayers() {
+    loadPlayers(auctionId)
+  }, [auctionId])
+
+  async function loadPlayers(currentAuctionId: string) {
     setLoading(true)
     setError("")
 
-    const { data, error: playersError } = await supabase
-      .from("players")
-      .select("id, name, team, role, status")
-      .order("name")
+    const [auctionResult, playersResult] = await Promise.all([
+      supabase
+        .from("auctions")
+        .select("name")
+        .eq("id", currentAuctionId)
+        .single(),
 
-    if (playersError) {
-      setError(playersError.message)
+      supabase
+        .from("players")
+        .select(`
+          id,
+          name,
+          team,
+          role,
+          auction_players!inner(
+            status
+          )
+        `)
+        .eq("auction_players.auction_id", currentAuctionId)
+        .order("name"),
+    ])
+
+    if (auctionResult.error) {
+      setError(auctionResult.error.message)
       setLoading(false)
       return
     }
 
-    setPlayers((data ?? []) as Player[])
+    if (playersResult.error) {
+      setError(playersResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    setAuctionName(auctionResult.data?.name ?? "")
+
+    const mappedPlayers = (playersResult.data ?? []).map((player) => {
+      const auctionPlayer = Array.isArray(player.auction_players)
+        ? player.auction_players[0]
+        : player.auction_players
+
+      return {
+        id: player.id,
+        name: player.name,
+        team: player.team,
+        role: player.role,
+        status: auctionPlayer?.status ?? "available",
+      }
+    }) as Player[]
+
+    setPlayers(mappedPlayers)
     setLoading(false)
   }
 
@@ -94,6 +145,11 @@ export default function GiocatoriPage() {
     player: Player,
     newStatus: "available" | "declined"
   ) {
+    if (!auctionId) {
+      setError("Nessuna asta selezionata.")
+      return
+    }
+
     if (player.status === newStatus) {
       return
     }
@@ -103,9 +159,10 @@ export default function GiocatoriPage() {
     setMessage("")
 
     const { error: updateError } = await supabase
-      .from("players")
+      .from("auction_players")
       .update({ status: newStatus })
-      .eq("id", player.id)
+      .eq("auction_id", auctionId)
+      .eq("player_id", player.id)
       .eq("status", player.status)
 
     if (updateError) {
@@ -138,14 +195,30 @@ export default function GiocatoriPage() {
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-8">
+        <div className="mb-2 text-sm font-medium text-gray-500">
+          {auctionName || "Asta"}
+        </div>
+
         <h1 className="text-3xl font-bold text-gray-900">
           Gestione giocatori
         </h1>
 
         <p className="mt-2 text-gray-600">
-          Gestisci disponibilità e rifiuto dei giocatori.
+          Gestisci disponibilità e rifiuto dei giocatori per questa asta.
         </p>
       </div>
+
+      {message && (
+        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {message}
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </div>
+      )}
 
       {/* Riepilogo */}
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
@@ -194,18 +267,6 @@ export default function GiocatoriPage() {
           </div>
         </button>
       </div>
-
-      {message && (
-        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
-        </div>
-      )}
 
       <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         {/* Filtri */}

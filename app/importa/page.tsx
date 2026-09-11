@@ -1,6 +1,8 @@
 "use client"
 
+import Link from "next/link"
 import { ChangeEvent, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import * as XLSX from "xlsx"
 import { supabase } from "@/lib/supabase/client"
 
@@ -39,6 +41,9 @@ function toNumber(value: unknown): number | null {
 }
 
 export default function ImportaPage() {
+  const searchParams = useSearchParams()
+  const auctionId = searchParams.get("auction")
+
   const [fileName, setFileName] = useState("")
   const [players, setPlayers] = useState<Player[]>([])
   const [error, setError] = useState("")
@@ -137,64 +142,75 @@ export default function ImportaPage() {
     A: players.filter((player) => player.role === "A").length,
   }
 
-async function handleImport() {
-  if (players.length === 0) {
-    return
-  }
-
-  setImporting(true)
-  setImportResult("")
-  setError("")
-
-  try {
-    const rows = players.map((player) => ({
-      external_id: player.external_id,
-      name: player.name,
-      out_of_list: player.out_of_list,
-      team: player.team,
-      under: player.under,
-      role: player.role,
-      mantra_role: player.mantra_role,
-      pgv: player.pgv,
-      mv: player.mv,
-      fm: player.fm,
-      fvm_1000: player.fvm_1000,
-      quotation: player.quotation,
-      fantasquadra: player.fantasquadra,
-      cost: player.cost,
-      status: "available",
-    }))
-
-    const { error } = await supabase
-      .from("players")
-      .upsert(rows, {
-        onConflict: "external_id",
-      })
-
-    if (error) {
-      throw error
+  async function handleImport() {
+    if (players.length === 0) {
+      return
     }
 
-    setImportResult(
-      `${players.length} giocatori importati correttamente.`
-    )
-  } catch (err) {
-    console.error(err)
+    setImporting(true)
+    setImportResult("")
+    setError("")
 
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Errore durante l'importazione."
-    )
-  } finally {
-    setImporting(false)
+    try {
+      const rows = players.map((player) => ({
+        external_id: player.external_id,
+        name: player.name,
+        out_of_list: player.out_of_list,
+        team: player.team,
+        under: player.under,
+        role: player.role,
+        mantra_role: player.mantra_role,
+        pgv: player.pgv,
+        mv: player.mv,
+        fm: player.fm,
+        fvm_1000: player.fvm_1000,
+        quotation: player.quotation,
+        fantasquadra: player.fantasquadra,
+        cost: player.cost,
+        status: "available",
+      }))
+
+      const { error } = await supabase
+        .from("players")
+        .upsert(rows, {
+          onConflict: "external_id",
+        })
+
+      if (error) {
+        throw error
+      }
+
+      setImportResult(
+        `${players.length} giocatori importati correttamente.`
+      )
+    } catch (err) {
+      console.error(err)
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Errore durante l'importazione."
+      )
+    } finally {
+      setImporting(false)
+    }
   }
-}
-
 
   return (
     <main className="min-h-screen bg-gray-100">
       <div className="mx-auto max-w-6xl px-6 py-10">
+
+        {/* Navigazione */}
+        {auctionId && (
+          <div className="mb-6">
+            <Link
+              href={`/asta?auction=${auctionId}`}
+              className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+            >
+              ← Torna all'asta
+            </Link>
+          </div>
+        )}
 
         <h1 className="text-3xl font-bold text-gray-900">
           Importa giocatori
@@ -289,13 +305,22 @@ async function handleImport() {
                 </button>
 
                 {importResult && (
-                  <p className="mt-3 text-sm font-medium text-green-700">
-                    {importResult}
-                  </p>
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-green-700">
+                      {importResult}
+                    </p>
+
+                    {auctionId && (
+                      <Link
+                        href={`/asta?auction=${auctionId}`}
+                        className="mt-3 inline-flex rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                      >
+                        Torna all'asta
+                      </Link>
+                    )}
+                  </div>
                 )}
               </div>
-
-
 
               <div className="mt-5 overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -368,3 +393,4 @@ async function handleImport() {
     </main>
   )
 }
+

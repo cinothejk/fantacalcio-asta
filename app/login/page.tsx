@@ -1,7 +1,7 @@
-
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 
@@ -36,6 +36,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100 px-6">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
+
         <div className="mb-8 text-center">
           <div className="mb-3 text-4xl">⚽</div>
 
@@ -44,7 +45,7 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Accedi per gestire l asta
+            Accedi per gestire l&apos;asta
           </p>
         </div>
 
@@ -69,12 +70,21 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
+            <div className="mb-2 flex items-center justify-between">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Password
+              </label>
+
+              <Link
+                href="/reset-password"
+                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
+                Password dimenticata?
+              </Link>
+            </div>
 
             <input
               id="password"
@@ -100,6 +110,19 @@ export default function LoginPage() {
           >
             {loading ? "Accesso in corso..." : "Accedi"}
           </button>
+
+          <div className="border-t border-gray-100 pt-5 text-center">
+            <p className="text-sm text-gray-500">
+              Non hai ancora un account?
+            </p>
+
+            <Link
+              href="/registrazione"
+              className="mt-1 inline-block text-sm font-semibold text-gray-900 hover:underline"
+            >
+              Registrati
+            </Link>
+          </div>
         </form>
       </div>
     </main>

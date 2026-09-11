@@ -17,7 +17,11 @@ export default function AuthGuard({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (pathname === "/login") {
+    if (
+      pathname === "/login" ||
+      pathname === "/registrazione" ||
+      pathname === "/reset-password"
+    ) {
       setLoading(false)
       return
     }
@@ -44,7 +48,11 @@ export default function AuthGuard({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && pathname !== "/login") {
+      if (
+        !session &&
+        pathname !== "/login" &&
+        pathname !== "/registrazione"
+      ) {
         router.replace("/login")
       }
     })
@@ -55,7 +63,7 @@ export default function AuthGuard({
     }
   }, [pathname, router])
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/registrazione") {
     return <>{children}</>
   }
 

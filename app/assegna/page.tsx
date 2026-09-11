@@ -1,6 +1,8 @@
+
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 
 type Participant = {
@@ -32,13 +34,18 @@ const roleColors = {
 }
 
 export default function AssegnaPage() {
+  const searchParams = useSearchParams()
+  const auctionId = searchParams.get("auction")
+
+  const [auctionName, setAuctionName] = useState("")
+
   const [participants, setParticipants] = useState<Participant[]>([])
   const [players, setPlayers] = useState<Player[]>([])
 
   const [search, setSearch] = useState("")
-  const [roleFilter, setRoleFilter] = useState<"ALL" | "P" | "D" | "C" | "A">(
-    "ALL"
-  )
+  const [roleFilter, setRoleFilter] = useState<
+    "ALL" | "P" | "D" | "C" | "A"
+  >("ALL")
 
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [selectedParticipantId, setSelectedParticipantId] = useState("")
@@ -50,25 +57,52 @@ export default function AssegnaPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (!auctionId) {
+      setLoading(false)
+      setError("Nessuna asta selezionata.")
+      return
+    }
 
-  async function loadData() {
+    loadData(auctionId)
+  }, [auctionId])
+
+  async function loadData(currentAuctionId: string) {
     setLoading(true)
     setError("")
 
-    const [participantsResult, playersResult] = await Promise.all([
-      supabase
-        .from("participants")
-        .select("id, name, remaining_credits")
-        .order("name"),
+    const [auctionResult, participantsResult, playersResult] =
+      await Promise.all([
+        supabase
+          .from("auctions")
+          .select("name")
+          .eq("id", currentAuctionId)
+          .single(),
 
-      supabase
-        .from("players")
-        .select("id, name, team, role, status")
-        .eq("status", "available")
-        .order("name"),
-    ])
+        supabase
+          .from("participants")
+          .select("id, name, remaining_credits")
+          .eq("auction_id", currentAuctionId)
+          .order("name"),
+
+        supabase
+          .from("players")
+          .select(`
+            id,
+            name,
+            team,
+            role,
+            auction_players!inner(status)
+          `)
+          .eq("auction_players.auction_id", currentAuctionId)
+          .eq("auction_players.status", "available")
+          .order("name"),
+      ])
+
+    if (auctionResult.error) {
+      setError(auctionResult.error.message)
+      setLoading(false)
+      return
+    }
 
     if (participantsResult.error) {
       setError(participantsResult.error.message)
@@ -82,8 +116,18 @@ export default function AssegnaPage() {
       return
     }
 
+    setAuctionName(auctionResult.data?.name ?? "")
     setParticipants(participantsResult.data ?? [])
-    setPlayers((playersResult.data ?? []) as Player[])
+
+    const availablePlayers = (playersResult.data ?? []).map((player) => ({
+      id: player.id,
+      name: player.name,
+      team: player.team,
+      role: player.role,
+      status: "available" as const,
+    }))
+
+    setPlayers(availablePlayers)
     setLoading(false)
   }
 
@@ -108,6 +152,11 @@ export default function AssegnaPage() {
   )
 
   async function assignPlayer() {
+    if (!auctionId) {
+      setError("Nessuna asta selezionata.")
+      return
+    }
+
     if (!selectedPlayer) {
       setError("Seleziona un giocatore.")
       return
@@ -140,6 +189,7 @@ export default function AssegnaPage() {
     const { error: rpcError } = await supabase.rpc(
       "assign_player_to_participant",
       {
+        p_auction_id: auctionId,
         p_player_id: selectedPlayer.id,
         p_participant_id: selectedParticipantId,
         p_price: parsedPrice,
@@ -159,7 +209,7 @@ export default function AssegnaPage() {
     setSelectedPlayer(null)
     setPrice("")
 
-    await loadData()
+    await loadData(auctionId)
 
     setAssigning(false)
   }
@@ -167,6 +217,10 @@ export default function AssegnaPage() {
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-8">
+        <div className="mb-2 text-sm font-medium text-gray-500">
+          {auctionName || "Asta"}
+        </div>
+
         <h1 className="text-3xl font-bold text-gray-900">
           Assegnazione manuale
         </h1>
@@ -353,6 +407,7 @@ export default function AssegnaPage() {
               <div className="rounded-lg bg-gray-50 px-4 py-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Crediti disponibili</span>
+
                   <strong className="text-gray-900">
                     {selectedParticipant.remaining_credits}
                   </strong>
@@ -361,6 +416,7 @@ export default function AssegnaPage() {
                 {price !== "" && Number(price) >= 0 && (
                   <div className="mt-2 flex justify-between">
                     <span className="text-gray-500">Dopo l&apos;acquisto</span>
+
                     <strong className="text-gray-900">
                       {selectedParticipant.remaining_credits - Number(price)}
                     </strong>
@@ -372,7 +428,12 @@ export default function AssegnaPage() {
             <button
               type="button"
               onClick={assignPlayer}
-              disabled={!selectedPlayer || !selectedParticipantId || assigning}
+              disabled={
+                !selectedPlayer ||
+                !selectedParticipantId ||
+                assigning ||
+                !auctionId
+              }
               className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {assigning ? "Assegnazione..." : "Assegna giocatore"}

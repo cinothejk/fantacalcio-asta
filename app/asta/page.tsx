@@ -9,6 +9,8 @@ type Participant = {
   remaining_credits: number
 }
 
+type Role = "P" | "D" | "C" | "A"
+
 type Player = {
   id: string
   external_id: number | null
@@ -34,8 +36,6 @@ type Purchase = {
   } | null
 }
 
-type Role = "P" | "D" | "C" | "A"
-
 const roles: { value: Role; label: string }[] = [
   { value: "P", label: "Portieri" },
   { value: "D", label: "Difensori" },
@@ -44,10 +44,12 @@ const roles: { value: Role; label: string }[] = [
 ]
 
 export default function AstaPage() {
+  const [auctionId, setAuctionId] = useState<string | null>(null)
+  const [auctionName, setAuctionName] = useState("Asta")
+
   const [participants, setParticipants] = useState<Participant[]>([])
   const [selectedParticipant, setSelectedParticipant] =
     useState<Participant | null>(null)
-
 
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [loadingPurchases, setLoadingPurchases] = useState(false)
@@ -66,16 +68,44 @@ export default function AstaPage() {
   const [assigning, setAssigning] = useState(false)
 
   useEffect(() => {
-    loadParticipants()
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get("auction")
+
+    setAuctionId(id)
+
+    if (!id) {
+      setLoading(false)
+      setError("Nessuna asta selezionata.")
+      return
+    }
+
+    loadAuction(id)
+    loadParticipants(id)
   }, [])
 
-  async function loadParticipants() {
+  async function loadAuction(id: string) {
+    const { data, error } = await supabase
+      .from("auctions")
+      .select("id, name")
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      setError(error.message)
+      return
+    }
+
+    setAuctionName(data.name)
+  }
+
+  async function loadParticipants(id: string) {
     setLoading(true)
     setError("")
 
     const { data, error } = await supabase
       .from("participants")
       .select("id, name, remaining_credits")
+      .eq("auction_id", id)
       .order("created_at", { ascending: true })
 
     if (error) {
@@ -88,26 +118,26 @@ export default function AstaPage() {
     setLoading(false)
   }
 
-function openAuctionModal() {
-  setSelectedRole(null)
-  setSelectedPlayer(null)
-  setSelectedParticipantId("")
-  setPrice("")
-  setError("")
-  setShowAuctionModal(true)
-}
+  function openAuctionModal() {
+    setSelectedRole(null)
+    setSelectedPlayer(null)
+    setSelectedParticipantId("")
+    setPrice("")
+    setError("")
+    setShowAuctionModal(true)
+  }
 
-function closeAuctionModal() {
-  setShowAuctionModal(false)
-  setSelectedRole(null)
-  setSelectedPlayer(null)
-  setSelectedParticipantId("")
-  setPrice("")
-  setError("")
-}
+  function closeAuctionModal() {
+    setShowAuctionModal(false)
+    setSelectedRole(null)
+    setSelectedPlayer(null)
+    setSelectedParticipantId("")
+    setPrice("")
+    setError("")
+  }
 
   async function drawPlayer() {
-    if (!selectedRole) {
+    if (!auctionId || !selectedRole) {
       return
     }
 
@@ -119,7 +149,8 @@ function closeAuctionModal() {
     const { data, error } = await supabase.rpc(
       "get_random_available_player",
       {
-        player_role: selectedRole,
+        p_auction_id: auctionId,
+        p_role: selectedRole,
       }
     )
 
@@ -129,147 +160,160 @@ function closeAuctionModal() {
       return
     }
 
-  if (!data || data.length === 0) {
-    setError(
-      `Non ci sono più giocatori disponibili per il ruolo ${selectedRole}.`
-    )
-    setDrawing(false)
-    return
-  }
-
-  setSelectedPlayer(data[0])
-  setDrawing(false)
-} 
-
-async function declinePlayer() {
-  if (!selectedPlayer) {
-    return
-  }
-
-  setError("")
-
-  const { error } = await supabase.rpc("decline_player", {
-    p_player_id: selectedPlayer.id,
-  })
-
-  if (error) {
-    setError(error.message)
-    return
-  }
-
-  setSelectedPlayer(null)
-}
-
-async function assignPlayer() {
-  if (!selectedPlayer || !selectedParticipantId) {
-    setError("Seleziona un partecipante.")
-    return
-  }
-
-  const numericPrice = Number(price)
-
-  if (!Number.isInteger(numericPrice) || numericPrice < 0) {
-    setError("Inserisci un prezzo valido.")
-    return
-  }
-
-  const participant = participants.find(
-    (item) => item.id === selectedParticipantId
-  )
-
-  if (!participant) {
-    setError("Partecipante non trovato.")
-    return
-  }
-
-  if (numericPrice > participant.remaining_credits) {
-    setError("Il partecipante non ha abbastanza crediti.")
-    return
-  }
-
-  setAssigning(true)
-  setError("")
-
-  const { error } = await supabase.rpc(
-    "assign_player_to_participant",
-    {
-      p_player_id: selectedPlayer.id,
-      p_participant_id: selectedParticipantId,
-      p_price: numericPrice,
-    }
-  )
-
-  if (error) {
-    setError(error.message)
-    setAssigning(false)
-    return
-  }
-
-  // Aggiorna i crediti visualizzati
-  setParticipants((current) =>
-    current.map((item) =>
-      item.id === selectedParticipantId
-        ? {
-            ...item,
-            remaining_credits: item.remaining_credits - numericPrice,
-          }
-        : item
-    )
-  )
-
-  await loadPurchases(selectedParticipantId)
-
-  setSelectedPlayer(null)
-  setSelectedParticipantId("")
-  setPrice("")
-  setAssigning(false)
-}
-
-async function loadPurchases(participantId: string) {
-  setLoadingPurchases(true)
-  setError("")
-
-  const { data, error } = await supabase
-    .from("purchases")
-    .select(`
-      id,
-      price,
-      created_at,
-      player:players (
-        name,
-        team,
-        role
+    if (!data || data.length === 0) {
+      setError(
+        `Non ci sono più giocatori disponibili per il ruolo ${selectedRole}.`
       )
-    `)
-    .eq("participant_id", participantId)
-    .order("created_at", { ascending: true })
+      setDrawing(false)
+      return
+    }
 
-  if (error) {
-    setError(error.message)
-    setPurchases([])
-  } else {
-    setPurchases(
-  (data ?? []).map((purchase) => ({
-    ...purchase,
-    player: Array.isArray(purchase.player)
-      ? purchase.player[0] ?? null
-      : purchase.player,
-  })) as Purchase[]
-)
+    setSelectedPlayer(data[0])
+    setDrawing(false)
   }
 
-  setLoadingPurchases(false)
-}
+  async function declinePlayer() {
+    if (!auctionId || !selectedPlayer) {
+      return
+    }
+
+    setError("")
+
+    const { error } = await supabase.rpc("decline_player", {
+      p_auction_id: auctionId,
+      p_player_id: selectedPlayer.id,
+    })
+
+    if (error) {
+      setError(error.message)
+      return
+    }
+
+    setSelectedPlayer(null)
+  }
+
+  async function assignPlayer() {
+    if (!auctionId || !selectedPlayer || !selectedParticipantId) {
+      setError("Seleziona un partecipante.")
+      return
+    }
+
+    const numericPrice = Number(price)
+
+    if (!Number.isInteger(numericPrice) || numericPrice < 0) {
+      setError("Inserisci un prezzo valido.")
+      return
+    }
+
+    const participant = participants.find(
+      (item) => item.id === selectedParticipantId
+    )
+
+    if (!participant) {
+      setError("Partecipante non trovato.")
+      return
+    }
+
+    if (numericPrice > participant.remaining_credits) {
+      setError("Il partecipante non ha abbastanza crediti.")
+      return
+    }
+
+    setAssigning(true)
+    setError("")
+
+    const { error } = await supabase.rpc(
+      "assign_player_to_participant",
+      {
+        p_auction_id: auctionId,
+        p_player_id: selectedPlayer.id,
+        p_participant_id: selectedParticipantId,
+        p_price: numericPrice,
+      }
+    )
+
+    if (error) {
+      setError(error.message)
+      setAssigning(false)
+      return
+    }
+
+    setParticipants((current) =>
+      current.map((item) =>
+        item.id === selectedParticipantId
+          ? {
+              ...item,
+              remaining_credits:
+                item.remaining_credits - numericPrice,
+            }
+          : item
+      )
+    )
+
+    await loadPurchases(selectedParticipantId)
+
+    setSelectedPlayer(null)
+    setSelectedParticipantId("")
+    setPrice("")
+    setAssigning(false)
+  }
+
+  async function loadPurchases(participantId: string) {
+    setLoadingPurchases(true)
+    setError("")
+
+    const { data, error } = await supabase
+      .from("purchases")
+      .select(`
+        id,
+        price,
+        created_at,
+        player:players (
+          name,
+          team,
+          role
+        )
+      `)
+      .eq("participant_id", participantId)
+      .eq("auction_id", auctionId)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      setError(error.message)
+      setPurchases([])
+    } else {
+      setPurchases(
+        (data ?? []).map((purchase) => ({
+          ...purchase,
+          player: Array.isArray(purchase.player)
+            ? purchase.player[0] ?? null
+            : purchase.player,
+        })) as Purchase[]
+      )
+    }
+
+    setLoadingPurchases(false)
+  }
 
   return (
     <main className="min-h-screen bg-gray-100">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
 
-        {/* HEADER / TAB */}
+        {/* HEADER */}
         <header className="overflow-hidden rounded-xl bg-white shadow-sm">
+
+          <div className="border-b px-6 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Asta
+            </p>
+
+            <h1 className="text-xl font-bold text-gray-900">
+              {auctionName}
+            </h1>
+          </div>
+
           <div className="flex overflow-x-auto border-b">
 
-            {/* TAB ASTA */}
             <button
               type="button"
               onClick={openAuctionModal}
@@ -278,7 +322,6 @@ async function loadPurchases(participantId: string) {
               🔨 ASTA
             </button>
 
-            {/* TAB PARTECIPANTI */}
             {participants.map((participant) => (
               <button
                 key={participant.id}
@@ -315,44 +358,50 @@ async function loadPurchases(participantId: string) {
             </div>
           )}
 
-          {!loading && !error && participants.length === 0 && (
-            <div className="rounded-xl bg-white p-8 text-center shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Nessun partecipante
-              </h2>
+          {!loading &&
+            !error &&
+            participants.length === 0 && (
+              <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Nessun partecipante
+                </h2>
 
-              <p className="mt-2 text-gray-500">
-                Aggiungi almeno un partecipante prima di iniziare l&apos;asta.
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && participants.length > 0 && !selectedParticipant && (
-            <div className="rounded-xl bg-white p-10 text-center shadow-sm">
-
-              <div className="text-5xl">
-                🔨
+                <p className="mt-2 text-gray-500">
+                  Aggiungi almeno un partecipante prima di iniziare
+                  l&apos;asta.
+                </p>
               </div>
+            )}
 
-              <h1 className="mt-4 text-3xl font-bold text-gray-900">
-                Asta del Fantacalcio
-              </h1>
+          {!loading &&
+            !error &&
+            participants.length > 0 &&
+            !selectedParticipant && (
+              <div className="rounded-xl bg-white p-10 text-center shadow-sm">
 
-              <p className="mx-auto mt-2 max-w-lg text-gray-500">
-                Clicca su <strong>ASTA</strong> per estrarre il prossimo
-                giocatore.
-              </p>
+                <div className="text-5xl">
+                  🔨
+                </div>
 
-              <button
-                type="button"
-                onClick={openAuctionModal}
-                className="mt-6 rounded-lg bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
-              >
-                🔨 Inizia asta
-              </button>
+                <h1 className="mt-4 text-3xl font-bold text-gray-900">
+                  Asta del Fantacalcio
+                </h1>
 
-            </div>
-          )}
+                <p className="mx-auto mt-2 max-w-lg text-gray-500">
+                  Clicca su <strong>ASTA</strong> per estrarre il prossimo
+                  giocatore.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={openAuctionModal}
+                  className="mt-6 rounded-lg bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
+                >
+                  🔨 Inizia asta
+                </button>
+
+              </div>
+            )}
 
           {selectedParticipant && (
             <div className="rounded-xl bg-white p-6 shadow-sm">
@@ -382,138 +431,154 @@ async function loadPurchases(participantId: string) {
               </div>
 
               <div className="mt-8 border-t pt-6">
+
                 <h2 className="text-lg font-semibold">
                   Rosa
                 </h2>
 
-                
-                  {selectedParticipant && (
-  <div className="mt-6">
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            {selectedParticipant.name}
-          </h2>
+                <div className="mt-6">
 
-          <p className="mt-1 text-gray-500">
-            Situazione attuale
-          </p>
-        </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-6">
 
-        <div className="text-left sm:text-right">
-          <p className="text-sm text-gray-500">
-            Crediti rimasti
-          </p>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-          <p className="text-3xl font-bold text-gray-900">
-            {selectedParticipant.remaining_credits}
-          </p>
-        </div>
-      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          {selectedParticipant.name}
+                        </h2>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg bg-gray-50 p-4">
-          <p className="text-sm text-gray-500">
-            Giocatori acquistati
-          </p>
+                        <p className="mt-1 text-gray-500">
+                          Situazione attuale
+                        </p>
+                      </div>
 
-          <p className="mt-1 text-2xl font-bold">
-            {purchases.length}
-          </p>
-        </div>
+                      <div className="text-left sm:text-right">
+                        <p className="text-sm text-gray-500">
+                          Crediti rimasti
+                        </p>
 
-        <div className="rounded-lg bg-gray-50 p-4">
-          <p className="text-sm text-gray-500">
-            Crediti spesi
-          </p>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {selectedParticipant.remaining_credits}
+                        </p>
+                      </div>
 
-          <p className="mt-1 text-2xl font-bold">
-            {purchases.reduce(
-              (total, purchase) => total + purchase.price,
-              0
-            )}
-          </p>
-        </div>
+                    </div>
 
-        <div className="rounded-lg bg-gray-50 p-4">
-          <p className="text-sm text-gray-500">
-            Crediti iniziali
-          </p>
+                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
 
-          <p className="mt-1 text-2xl font-bold">
-            {selectedParticipant.remaining_credits +
-              purchases.reduce(
-                (total, purchase) => total + purchase.price,
-                0
-              )}
-          </p>
-        </div>
-      </div>
-    </div>
+                      <div className="rounded-lg bg-gray-50 p-4">
+                        <p className="text-sm text-gray-500">
+                          Giocatori acquistati
+                        </p>
 
-    <div className="mt-6">
-      <h3 className="text-xl font-bold text-gray-900">
-        Rosa
-      </h3>
+                        <p className="mt-1 text-2xl font-bold">
+                          {purchases.length}
+                        </p>
+                      </div>
 
-      {loadingPurchases ? (
-        <p className="mt-4 text-gray-500">
-          Caricamento rosa...
-        </p>
-      ) : purchases.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
-          Nessun giocatore acquistato.
-        </div>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {purchases.map((purchase, index) => (
-            <div
-              key={purchase.id}
-              className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-600">
-                  {index + 1}
+                      <div className="rounded-lg bg-gray-50 p-4">
+                        <p className="text-sm text-gray-500">
+                          Crediti spesi
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold">
+                          {purchases.reduce(
+                            (total, purchase) =>
+                              total + purchase.price,
+                            0
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-gray-50 p-4">
+                        <p className="text-sm text-gray-500">
+                          Crediti iniziali
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold">
+                          {selectedParticipant.remaining_credits +
+                            purchases.reduce(
+                              (total, purchase) =>
+                                total + purchase.price,
+                              0
+                            )}
+                        </p>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Rosa
+                    </h3>
+
+                    {loadingPurchases ? (
+                      <p className="mt-4 text-gray-500">
+                        Caricamento rosa...
+                      </p>
+                    ) : purchases.length === 0 ? (
+                      <div className="mt-4 rounded-xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
+                        Nessun giocatore acquistato.
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+
+                        {purchases.map((purchase, index) => (
+                          <div
+                            key={purchase.id}
+                            className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+                          >
+
+                            <div className="flex items-center gap-4">
+
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-600">
+                                {index + 1}
+                              </div>
+
+                              <div>
+                                <p className="font-semibold text-gray-900">
+                                  {purchase.player?.name ??
+                                    "Giocatore"}
+                                </p>
+
+                                <p className="text-sm text-gray-500">
+                                  {purchase.player?.team ??
+                                    "Squadra non disponibile"}
+                                  {" · "}
+                                  {purchase.player?.role ?? "-"}
+                                </p>
+                              </div>
+
+                            </div>
+
+                            <div className="text-left sm:text-right">
+
+                              <p className="text-xs text-gray-500">
+                                Acquistato
+                              </p>
+
+                              <p className="text-xl font-bold text-gray-900">
+                                {purchase.price} crediti
+                              </p>
+
+                            </div>
+
+                          </div>
+                        ))}
+
+                      </div>
+                    )}
+
+                  </div>
+
                 </div>
-
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    {purchase.player?.name ?? "Giocatore"}
-                  </p>
-
-                  <p className="text-sm text-gray-500">
-                    {purchase.player?.team ?? "Squadra non disponibile"}
-                    {" · "}
-                    {purchase.player?.role ?? "-"}
-                  </p>
-                </div>
               </div>
-
-              <div className="text-left sm:text-right">
-                <p className="text-xs text-gray-500">
-                  Acquistato
-                </p>
-
-                <p className="text-xl font-bold text-gray-900">
-                  {purchase.price} crediti
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-)}
-
-              </div>
-
             </div>
           )}
 
         </section>
-
       </div>
 
       {/* MODALE ASTA */}
@@ -528,6 +593,7 @@ async function loadPurchases(participantId: string) {
           >
 
             <div className="flex items-center justify-between">
+
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
                   Nuova asta
@@ -546,14 +612,17 @@ async function loadPurchases(participantId: string) {
               >
                 ×
               </button>
+
             </div>
 
             <div className="mt-6">
+
               <p className="mb-3 text-sm font-medium text-gray-700">
                 Ruolo
               </p>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+
                 {roles.map((role) => (
                   <button
                     key={role.value}
@@ -565,6 +634,7 @@ async function loadPurchases(participantId: string) {
                         : "border-gray-200 bg-white text-gray-900 hover:border-gray-400"
                     }`}
                   >
+
                     <div className="text-2xl font-bold">
                       {role.value}
                     </div>
@@ -572,8 +642,10 @@ async function loadPurchases(participantId: string) {
                     <div className="mt-1 text-xs">
                       {role.label}
                     </div>
+
                   </button>
                 ))}
+
               </div>
             </div>
 
@@ -587,146 +659,165 @@ async function loadPurchases(participantId: string) {
               >
                 {drawing
                   ? "🎲 Estrazione..."
-                  : `🎲 Estrai giocatore${selectedRole ? ` — ${selectedRole}` : ""}`}
+                  : `🎲 Estrai giocatore${
+                      selectedRole
+                        ? ` — ${selectedRole}`
+                        : ""
+                    }`}
               </button>
 
               {selectedPlayer && (
-  <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
+                <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
 
-    <div className="text-center">
+                  <div className="text-center">
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-        Giocatore estratto
-      </p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Giocatore estratto
+                    </p>
 
-      <h3 className="mt-2 text-3xl font-bold text-gray-900">
-        {selectedPlayer.name}
-      </h3>
+                    <h3 className="mt-2 text-3xl font-bold text-gray-900">
+                      {selectedPlayer.name}
+                    </h3>
 
-      <p className="mt-1 text-gray-600">
-        {selectedPlayer.team ?? "Squadra non disponibile"}
-        {" · "}
-        {selectedPlayer.role}
-      </p>
+                    <p className="mt-1 text-gray-600">
+                      {selectedPlayer.team ??
+                        "Squadra non disponibile"}
+                      {" · "}
+                      {selectedPlayer.role}
+                    </p>
 
-    </div>
+                  </div>
 
-    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
 
-      <div className="rounded-lg bg-white p-3 text-center">
-        <p className="text-xs text-gray-500">
-          Quotazione
-        </p>
+                    <div className="rounded-lg bg-white p-3 text-center">
+                      <p className="text-xs text-gray-500">
+                        Quotazione
+                      </p>
 
-        <p className="mt-1 font-bold">
-          {selectedPlayer.quotation ?? "-"}
-        </p>
-      </div>
+                      <p className="mt-1 font-bold">
+                        {selectedPlayer.quotation ?? "-"}
+                      </p>
+                    </div>
 
-      <div className="rounded-lg bg-white p-3 text-center">
-        <p className="text-xs text-gray-500">
-          MV
-        </p>
+                    <div className="rounded-lg bg-white p-3 text-center">
+                      <p className="text-xs text-gray-500">
+                        MV
+                      </p>
 
-        <p className="mt-1 font-bold">
-          {selectedPlayer.mv ?? "-"}
-        </p>
-      </div>
+                      <p className="mt-1 font-bold">
+                        {selectedPlayer.mv ?? "-"}
+                      </p>
+                    </div>
 
-      <div className="rounded-lg bg-white p-3 text-center">
-        <p className="text-xs text-gray-500">
-          FM
-        </p>
+                    <div className="rounded-lg bg-white p-3 text-center">
+                      <p className="text-xs text-gray-500">
+                        FM
+                      </p>
 
-        <p className="mt-1 font-bold">
-          {selectedPlayer.fm ?? "-"}
-        </p>
-      </div>
+                      <p className="mt-1 font-bold">
+                        {selectedPlayer.fm ?? "-"}
+                      </p>
+                    </div>
 
-      <div className="rounded-lg bg-white p-3 text-center">
-        <p className="text-xs text-gray-500">
-          Costo
-        </p>
+                    <div className="rounded-lg bg-white p-3 text-center">
+                      <p className="text-xs text-gray-500">
+                        Costo
+                      </p>
 
-        <p className="mt-1 font-bold">
-          {selectedPlayer.cost ?? "-"}
-        </p>
-      </div>
+                      <p className="mt-1 font-bold">
+                        {selectedPlayer.cost ?? "-"}
+                      </p>
+                    </div>
 
-    </div>
+                  </div>
+                </div>
+              )}
 
-  </div>
-)}
+              {selectedPlayer && (
+                <div className="mt-4 space-y-4">
 
-{selectedPlayer && (
-  <div className="mt-4 space-y-4">
-    <div>
-      <label className="mb-2 block text-sm font-medium text-gray-700">
-        Partecipante
-      </label>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Partecipante
+                    </label>
 
-      <select
-        value={selectedParticipantId}
-        onChange={(e) => setSelectedParticipantId(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
-      >
-        <option value="">Seleziona partecipante</option>
+                    <select
+                      value={selectedParticipantId}
+                      onChange={(e) =>
+                        setSelectedParticipantId(e.target.value)
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
+                    >
+                      <option value="">
+                        Seleziona partecipante
+                      </option>
 
-        {participants.map((participant) => (
-          <option key={participant.id} value={participant.id}>
-            {participant.name} — {participant.remaining_credits} crediti
-          </option>
-        ))}
-      </select>
-    </div>
+                      {participants.map((participant) => (
+                        <option
+                          key={participant.id}
+                          value={participant.id}
+                        >
+                          {participant.name} —{" "}
+                          {participant.remaining_credits} crediti
+                        </option>
+                      ))}
 
-    <div>
-      <label className="mb-2 block text-sm font-medium text-gray-700">
-        Prezzo di acquisto
-      </label>
+                    </select>
+                  </div>
 
-      <input
-        type="number"
-        min="0"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        placeholder="Inserisci il prezzo"
-        className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
-      />
-    </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Prezzo di acquisto
+                    </label>
 
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <button
-        type="button"
-        onClick={declinePlayer}
-        disabled={assigning}
-        className="rounded-lg border border-red-300 px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        ❌ Rifiuta
-      </button>
+                    <input
+                      type="number"
+                      min="0"
+                      value={price}
+                      onChange={(e) =>
+                        setPrice(e.target.value)
+                      }
+                      placeholder="Inserisci il prezzo"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
+                    />
+                  </div>
 
-      <button
-        type="button"
-        onClick={assignPlayer}
-        disabled={
-          assigning ||
-          !selectedParticipantId ||
-          price === ""
-        }
-        className="rounded-lg bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-      >
-        {assigning ? "Assegnazione..." : "💰 Assegna"}
-      </button>
-    </div>
-  </div>
-)}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                    <button
+                      type="button"
+                      onClick={declinePlayer}
+                      disabled={assigning}
+                      className="rounded-lg border border-red-300 px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      ❌ Rifiuta
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={assignPlayer}
+                      disabled={
+                        assigning ||
+                        !selectedParticipantId ||
+                        price === ""
+                      }
+                      className="rounded-lg bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                    >
+                      {assigning
+                        ? "Assegnazione..."
+                        : "💰 Assegna"}
+                    </button>
+
+                  </div>
+
+                </div>
+              )}
 
             </div>
-
           </div>
         </div>
       )}
-
     </main>
   )
 }

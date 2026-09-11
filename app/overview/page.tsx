@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import * as XLSX from "xlsx"
 import { supabase } from "@/lib/supabase/client"
 
@@ -27,24 +28,27 @@ role: Role
 }
 
 type Player = {
-id: string
-name: string
-team: string | null
-role: Role
-status: "available" | "sold" | "declined"
+  id: string
+  name: string
+  team: string | null
+  role: Role
+  status: "available" | "sold" | "declined"
 }
 
 export default function OverviewPage() {
-const [participants, setParticipants] = useState<Participant[]>([])
-const [purchases, setPurchases] = useState<Purchase[]>([])
-const [players, setPlayers] = useState<Player[]>([])
-const [loading, setLoading] = useState(true)
-const [error, setError] = useState("")
-const [deletingPurchaseId, setDeletingPurchaseId] = useState("")
+  const searchParams = useSearchParams()
+  const auctionId = searchParams.get("auction")
 
-useEffect(() => {
-loadOverview()
-}, [])
+  const [participants, setParticipants] = useState<Participant[]>([])
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [deletingPurchaseId, setDeletingPurchaseId] = useState("")
+
+  useEffect(() => {
+    loadOverview()
+  }, [auctionId])
 
 async function deletePurchase(purchaseId: string) {
 const confirmed = window.confirm(
@@ -76,14 +80,24 @@ setDeletingPurchaseId("")
 }
 
 async function loadOverview() {
-setLoading(true)
-setError("")
+  setLoading(true)
+  setError("")
+
+  if (!auctionId) {
+    setError("Nessuna asta selezionata.")
+    setParticipants([])
+    setPurchases([])
+    setPlayers([])
+    setLoading(false)
+    return
+  }
 
 
-const participantsResult = await supabase
-  .from("participants")
-  .select("id, name, initial_credits, remaining_credits")
-  .order("created_at", { ascending: true })
+  const participantsResult = await supabase
+    .from("participants")
+    .select("id, name, initial_credits, remaining_credits")
+    .eq("auction_id", auctionId)
+    .order("created_at", { ascending: true })
 
 if (participantsResult.error) {
   setError(participantsResult.error.message)
@@ -91,21 +105,23 @@ if (participantsResult.error) {
   return
 }
 
-const purchasesResult = await supabase
-  .from("purchases")
-  .select(`
-    id,
-    participant_id,
-    player_id,
-    price,
-    created_at,
-    player:players (
-      name,
-      team,
-      role
-    )
-  `)
-  .order("created_at", { ascending: true })
+  const purchasesResult = await supabase
+    .from("purchases")
+    .select(`
+      id,
+      participant_id,
+      player_id,
+      auction_id,
+      price,
+      created_at,
+      player:players (
+        name,
+        team,
+        role
+      )
+    `)
+    .eq("auction_id", auctionId)
+    .order("created_at", { ascending: true })
 
 if (purchasesResult.error) {
   setError(purchasesResult.error.message)
@@ -113,10 +129,19 @@ if (purchasesResult.error) {
   return
 }
 
-const playersResult = await supabase
-  .from("players")
-  .select("id, name, team, role, status")
-  .order("name", { ascending: true })
+  const playersResult = await supabase
+    .from("players")
+    .select(`
+      id,
+      name,
+      team,
+      role,
+      auction_players!inner(
+        status
+      )
+    `)
+    .eq("auction_players.auction_id", auctionId)
+    .order("name", { ascending: true })
 
 if (playersResult.error) {
   setError(playersResult.error.message)
@@ -127,15 +152,30 @@ if (playersResult.error) {
 setParticipants(participantsResult.data ?? [])
 
 setPurchases(
-  (purchasesResult.data ?? []).map((purchase) => ({
-    ...purchase,
-    player: Array.isArray(purchase.player)
-      ? purchase.player[0] ?? null
-      : purchase.player,
-  })) as Purchase[]
-)
+    (purchasesResult.data ?? []).map((purchase) => ({
+      ...purchase,
+      player: Array.isArray(purchase.player)
+        ? purchase.player[0] ?? null
+        : purchase.player,
+    })) as Purchase[]
+  )
 
-setPlayers((playersResult.data ?? []) as Player[])
+  setPlayers(
+    (playersResult.data ?? []).map((player) => {
+      const auctionPlayer = Array.isArray(player.auction_players)
+        ? player.auction_players[0]
+        : player.auction_players
+
+      return {
+        id: player.id,
+        name: player.name,
+        team: player.team,
+        role: player.role,
+        status:
+          auctionPlayer?.status ?? "available",
+      }
+    })
+  )
 
 setLoading(false)
 

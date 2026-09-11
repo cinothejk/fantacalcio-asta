@@ -15,6 +15,7 @@ export default function Home() {
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [deletingAuctionId, setDeletingAuctionId] = useState<string | null>(null)
   const [showNewAuction, setShowNewAuction] = useState(false)
   const [auctionName, setAuctionName] = useState("")
   const [error, setError] = useState("")
@@ -39,46 +40,87 @@ export default function Home() {
     setLoading(false)
   }
 
-  async function createAuction() {
-    const name = auctionName.trim()
 
-    if (!name) {
-      setError("Inserisci un nome per l'asta.")
+async function createAuction() {
+  const name = auctionName.trim()
+
+  if (!name) {
+    setError("Inserisci un nome per l'asta.")
+    return
+  }
+
+  setCreating(true)
+  setError("")
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    setError("Utente non autenticato.")
+    setCreating(false)
+    return
+  }
+
+  const {
+    data: auction,
+    error,
+  } = await supabase
+    .from("auctions")
+    .insert({
+      user_id: user.id,
+      name,
+    })
+    .select("id")
+    .single()
+
+  if (error) {
+    console.error(error)
+    setError("Errore nella creazione dell'asta.")
+    setCreating(false)
+    return
+  }
+
+  setAuctionName("")
+  setShowNewAuction(false)
+  setCreating(false)
+
+  window.location.href = `/partecipanti?auction=${auction.id}`
+}
+
+
+
+  async function deleteAuction(auction: Auction) {
+    const confirmed = window.confirm(
+      `Sei sicuro di voler cancellare l'asta "${auction.name}"?\n\n` +
+      "Verranno cancellati anche tutti i partecipanti, gli acquisti e i dati relativi a questa asta.\n\n" +
+      "Questa operazione non può essere annullata."
+    )
+
+    if (!confirmed) {
       return
     }
 
-    setCreating(true)
+    setDeletingAuctionId(auction.id)
     setError("")
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      setError("Utente non autenticato.")
-      setCreating(false)
-      return
-    }
 
     const { error } = await supabase
       .from("auctions")
-      .insert({
-        user_id: user.id,
-        name,
-      })
+      .delete()
+      .eq("id", auction.id)
 
     if (error) {
       console.error(error)
-      setError("Errore nella creazione dell'asta.")
-      setCreating(false)
+      setError("Errore nella cancellazione dell'asta.")
+      setDeletingAuctionId(null)
       return
     }
 
-    setAuctionName("")
-    setShowNewAuction(false)
-    setCreating(false)
+    setAuctions((currentAuctions) =>
+      currentAuctions.filter((currentAuction) => currentAuction.id !== auction.id)
+    )
 
-    await loadAuctions()
+    setDeletingAuctionId(null)
   }
 
   return (
@@ -113,6 +155,12 @@ export default function Home() {
             </button>
           </div>
 
+          {error && !showNewAuction && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           {loading ? (
             <div className="rounded-xl bg-white p-6 shadow-sm">
               <p className="text-gray-500">
@@ -138,30 +186,44 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {auctions.map((auction) => (
-                <div
-                  key={auction.id}
-                  className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-                >
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    🏆 {auction.name}
-                  </h3>
+              {auctions.map((auction) => {
+                const isDeleting = deletingAuctionId === auction.id
 
-                  <p className="mt-2 text-sm text-gray-500">
-                    {auction.participants_count}{" "}
-                    {auction.participants_count === 1
-                      ? "partecipante"
-                      : "partecipanti"}
-                  </p>
-
-                  <Link
-                    href={`/asta?auction=${auction.id}`}
-                    className="mt-5 inline-block rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+                return (
+                  <div
+                    key={auction.id}
+                    className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                   >
-                    Apri asta →
-                  </Link>
-                </div>
-              ))}
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      🏆 {auction.name}
+                    </h3>
+
+                    <p className="mt-2 text-sm text-gray-500">
+                      {auction.participants_count}{" "}
+                      {auction.participants_count === 1
+                        ? "partecipante"
+                        : "partecipanti"}
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link
+                        href={`/asta?auction=${auction.id}`}
+                        className="rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+                      >
+                        Apri asta →
+                      </Link>
+
+                      <button
+                        onClick={() => deleteAuction(auction)}
+                        disabled={isDeleting || deletingAuctionId !== null}
+                        className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isDeleting ? "Cancellazione..." : "🗑️ Cancella"}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>
@@ -223,96 +285,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* MENU */}
-        <section>
-          <h2 className="mb-5 text-2xl font-bold text-gray-900">
-            Gestione
-          </h2>
-
-          <nav className="grid gap-4 sm:grid-cols-2">
-
-            <Link
-              href="/partecipanti"
-              className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <h2 className="text-xl font-semibold text-gray-900">
-                👥 Partecipanti
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-500">
-                Aggiungi e gestisci i partecipanti all&apos;asta.
-              </p>
-            </Link>
-
-            <Link
-              href="/importa"
-              className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <h2 className="text-xl font-semibold text-gray-900">
-                📋 Importa giocatori
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-500">
-                Importa la lista dei giocatori da XLSX o CSV.
-              </p>
-            </Link>
-
-            <Link
-              href="/asta"
-              className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <h2 className="text-xl font-semibold text-gray-900">
-                🔨 Asta
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-500">
-                Avvia e gestisci l&apos;asta dei giocatori.
-              </p>
-            </Link>
-
-            <Link
-              href="/overview"
-              className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <h2 className="text-xl font-semibold text-gray-900">
-                📊 Overview
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-500">
-                Visualizza la situazione delle rose e dei crediti.
-              </p>
-            </Link>
-
-            <Link
-              href="/assegna"
-              className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <h2 className="text-xl font-semibold text-gray-900">
-                📌 Assegna
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-500">
-                Assegna giocatori manualmente.
-              </p>
-            </Link>
-
-            <Link
-              href="/giocatori"
-              className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-            >
-              <h2 className="text-xl font-semibold text-gray-900">
-                🏃 Giocatori
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-500">
-                Visualizza la situazione dei giocatori.
-              </p>
-            </Link>
-
-          </nav>
-        </section>
-
       </div>
     </main>
   )
 }
+
