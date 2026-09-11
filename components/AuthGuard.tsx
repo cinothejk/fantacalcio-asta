@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -7,81 +6,75 @@ import Navbar from "@/components/Navbar"
 import { supabase } from "@/lib/supabase/client"
 
 export default function AuthGuard({
-  children,
+children,
 }: {
-  children: React.ReactNode
+children: React.ReactNode
 }) {
-  const pathname = usePathname()
-  const router = useRouter()
+const pathname = usePathname()
+const router = useRouter()
 
-  const [loading, setLoading] = useState(true)
+const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (
-      pathname === "/login" ||
-      pathname === "/registrazione" ||
-      pathname === "/reset-password"
-    ) {
-      setLoading(false)
-      return
-    }
+const isPublicPage =
+pathname === "/login" ||
+pathname === "/registrazione" ||
+pathname === "/reset-password"
 
-    let mounted = true
-
-    async function checkSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        router.replace("/login")
-        return
-      }
-
-      if (mounted) {
-        setLoading(false)
-      }
-    }
-
-    checkSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (
-        !session &&
-        pathname !== "/login" &&
-        pathname !== "/registrazione"
-      ) {
-        router.replace("/login")
-      }
-    })
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [pathname, router])
-
-  if (pathname === "/login" || pathname === "/registrazione") {
-    return <>{children}</>
-  }
-
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-100">
-        <div className="text-sm text-gray-500">
-          Controllo autenticazione...
-        </div>
-      </main>
-    )
-  }
-
-  return (
-    <>
-      <Navbar />
-      {children}
-    </>
-  )
+useEffect(() => {
+if (isPublicPage) {
+setLoading(false)
+return
 }
 
+
+let mounted = true
+
+async function checkSession() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    router.replace("/login")
+    return
+  }
+
+  if (mounted) {
+    setLoading(false)
+  }
+}
+
+checkSession()
+
+const {
+  data: { subscription },
+} = supabase.auth.onAuthStateChange((_event, session) => {
+  if (!session) {
+    router.replace("/login")
+  }
+})
+
+return () => {
+  mounted = false
+  subscription.unsubscribe()
+}
+
+
+}, [isPublicPage, pathname, router])
+
+if (isPublicPage) {
+return <>{children}</>
+}
+
+if (loading) {
+return ( <main className="flex min-h-screen items-center justify-center bg-gray-100"> <div className="text-sm text-gray-500">
+Controllo autenticazione... </div> </main>
+)
+}
+
+return (
+<> <Navbar />
+{children}
+</>
+)
+}

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -297,27 +298,26 @@ export default function AstaPage() {
 
   return (
     <main className="min-h-screen bg-gray-100">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
 
         {/* HEADER */}
         <header className="overflow-hidden rounded-xl bg-white shadow-sm">
 
-          <div className="border-b px-6 py-4">
+          <div className="border-b px-4 py-4 sm:px-6">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
               Asta
             </p>
 
-            <h1 className="text-xl font-bold text-gray-900">
+            <h1 className="mt-1 break-words text-xl font-bold text-gray-900 sm:text-2xl">
               {auctionName}
             </h1>
           </div>
 
           <div className="flex overflow-x-auto border-b">
-
             <button
               type="button"
               onClick={openAuctionModal}
-              className="shrink-0 border-b-2 border-black px-6 py-4 text-sm font-bold text-gray-900 transition hover:bg-gray-50"
+              className="shrink-0 border-b-2 border-black px-5 py-4 text-sm font-bold text-gray-900 transition hover:bg-gray-50 sm:px-6"
             >
               🔨 ASTA
             </button>
@@ -330,7 +330,7 @@ export default function AstaPage() {
                   setSelectedParticipant(participant)
                   loadPurchases(participant.id)
                 }}
-                className={`shrink-0 border-b-2 px-6 py-4 text-sm font-medium transition ${
+                className={`shrink-0 border-b-2 px-5 py-4 text-sm font-medium transition sm:px-6 ${
                   selectedParticipant?.id === participant.id
                     ? "border-black text-gray-900"
                     : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900"
@@ -339,21 +339,20 @@ export default function AstaPage() {
                 {participant.name}
               </button>
             ))}
-
           </div>
         </header>
 
         {/* CONTENUTO */}
-        <section className="mt-6">
+        <section className="mt-4 sm:mt-6">
 
           {loading && (
-            <div className="rounded-xl bg-white p-8 text-center text-gray-500 shadow-sm">
+            <div className="rounded-xl bg-white p-6 text-center text-sm text-gray-500 shadow-sm sm:p-8 sm:text-base">
               Caricamento partecipanti...
             </div>
           )}
 
           {!loading && error && (
-            <div className="rounded-xl bg-red-50 p-6 text-red-700 shadow-sm">
+            <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700 shadow-sm sm:p-6 sm:text-base">
               Errore: {error}
             </div>
           )}
@@ -361,15 +360,17 @@ export default function AstaPage() {
           {!loading &&
             !error &&
             participants.length === 0 && (
-              <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+              <div className="rounded-xl bg-white p-6 text-center shadow-sm sm:p-8">
+
                 <h2 className="text-xl font-semibold text-gray-900">
                   Nessun partecipante
                 </h2>
 
-                <p className="mt-2 text-gray-500">
+                <p className="mt-2 text-sm text-gray-500 sm:text-base">
                   Aggiungi almeno un partecipante prima di iniziare
                   l&apos;asta.
                 </p>
+
               </div>
             )}
 
@@ -377,17 +378,17 @@ export default function AstaPage() {
             !error &&
             participants.length > 0 &&
             !selectedParticipant && (
-              <div className="rounded-xl bg-white p-10 text-center shadow-sm">
+              <div className="rounded-xl bg-white px-5 py-10 text-center shadow-sm sm:p-10">
 
                 <div className="text-5xl">
                   🔨
                 </div>
 
-                <h1 className="mt-4 text-3xl font-bold text-gray-900">
+                <h1 className="mt-4 text-2xl font-bold text-gray-900 sm:text-3xl">
                   Asta del Fantacalcio
                 </h1>
 
-                <p className="mx-auto mt-2 max-w-lg text-gray-500">
+                <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500 sm:text-base">
                   Clicca su <strong>ASTA</strong> per estrarre il prossimo
                   giocatore.
                 </p>
@@ -395,7 +396,7 @@ export default function AstaPage() {
                 <button
                   type="button"
                   onClick={openAuctionModal}
-                  className="mt-6 rounded-lg bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
+                  className="mt-6 w-full rounded-lg bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
                 >
                   🔨 Inizia asta
                 </button>
@@ -404,21 +405,22 @@ export default function AstaPage() {
             )}
 
           {selectedParticipant && (
-            <div className="rounded-xl bg-white p-6 shadow-sm">
+            <div className="rounded-xl bg-white p-4 shadow-sm sm:p-6">
 
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              {/* RIEPILOGO PARTECIPANTE */}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-gray-500">
                     Partecipante
                   </p>
 
-                  <h1 className="text-3xl font-bold text-gray-900">
+                  <h1 className="mt-1 break-words text-2xl font-bold text-gray-900 sm:text-3xl">
                     {selectedParticipant.name}
                   </h1>
                 </div>
 
-                <div className="rounded-lg bg-gray-100 px-5 py-3">
+                <div className="w-full rounded-lg bg-gray-100 px-5 py-3 sm:w-auto">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     Crediti residui
                   </p>
@@ -430,24 +432,25 @@ export default function AstaPage() {
 
               </div>
 
-              <div className="mt-8 border-t pt-6">
+              <div className="mt-6 border-t pt-5 sm:mt-8 sm:pt-6">
 
                 <h2 className="text-lg font-semibold">
                   Rosa
                 </h2>
 
-                <div className="mt-6">
+                <div className="mt-4 sm:mt-6">
 
-                  <div className="rounded-xl border border-gray-200 bg-white p-6">
+                  {/* RIEPILOGO ROSA */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
 
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
+                      <div className="min-w-0">
+                        <h2 className="break-words text-xl font-bold text-gray-900 sm:text-2xl">
                           {selectedParticipant.name}
                         </h2>
 
-                        <p className="mt-1 text-gray-500">
+                        <p className="mt-1 text-sm text-gray-500 sm:text-base">
                           Situazione attuale
                         </p>
                       </div>
@@ -464,24 +467,24 @@ export default function AstaPage() {
 
                     </div>
 
-                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3">
 
-                      <div className="rounded-lg bg-gray-50 p-4">
-                        <p className="text-sm text-gray-500">
+                      <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
+                        <p className="text-xs text-gray-500 sm:text-sm">
                           Giocatori acquistati
                         </p>
 
-                        <p className="mt-1 text-2xl font-bold">
+                        <p className="mt-1 text-xl font-bold sm:text-2xl">
                           {purchases.length}
                         </p>
                       </div>
 
-                      <div className="rounded-lg bg-gray-50 p-4">
-                        <p className="text-sm text-gray-500">
+                      <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
+                        <p className="text-xs text-gray-500 sm:text-sm">
                           Crediti spesi
                         </p>
 
-                        <p className="mt-1 text-2xl font-bold">
+                        <p className="mt-1 text-xl font-bold sm:text-2xl">
                           {purchases.reduce(
                             (total, purchase) =>
                               total + purchase.price,
@@ -490,12 +493,12 @@ export default function AstaPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-lg bg-gray-50 p-4">
-                        <p className="text-sm text-gray-500">
+                      <div className="col-span-2 rounded-lg bg-gray-50 p-3 sm:col-span-1 sm:p-4">
+                        <p className="text-xs text-gray-500 sm:text-sm">
                           Crediti iniziali
                         </p>
 
-                        <p className="mt-1 text-2xl font-bold">
+                        <p className="mt-1 text-xl font-bold sm:text-2xl">
                           {selectedParticipant.remaining_credits +
                             purchases.reduce(
                               (total, purchase) =>
@@ -508,6 +511,7 @@ export default function AstaPage() {
                     </div>
                   </div>
 
+                  {/* ROSA */}
                   <div className="mt-6">
 
                     <h3 className="text-xl font-bold text-gray-900">
@@ -515,11 +519,11 @@ export default function AstaPage() {
                     </h3>
 
                     {loadingPurchases ? (
-                      <p className="mt-4 text-gray-500">
+                      <p className="mt-4 text-sm text-gray-500 sm:text-base">
                         Caricamento rosa...
                       </p>
                     ) : purchases.length === 0 ? (
-                      <div className="mt-4 rounded-xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
+                      <div className="mt-4 rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm text-gray-500 sm:p-6 sm:text-base">
                         Nessun giocatore acquistato.
                       </div>
                     ) : (
@@ -531,14 +535,14 @@ export default function AstaPage() {
                             className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
                           >
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
 
                               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-600">
                                 {index + 1}
                               </div>
 
-                              <div>
-                                <p className="font-semibold text-gray-900">
+                              <div className="min-w-0">
+                                <p className="break-words font-semibold text-gray-900">
                                   {purchase.player?.name ??
                                     "Giocatore"}
                                 </p>
@@ -553,7 +557,7 @@ export default function AstaPage() {
 
                             </div>
 
-                            <div className="text-left sm:text-right">
+                            <div className="border-t pt-3 text-left sm:border-0 sm:pt-0 sm:text-right">
 
                               <p className="text-xs text-gray-500">
                                 Acquistato
@@ -584,38 +588,43 @@ export default function AstaPage() {
       {/* MODALE ASTA */}
       {showAuctionModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4"
           onClick={closeAuctionModal}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
+              className="my-3 flex max-h-[calc(100vh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl sm:my-0 sm:max-h-[calc(100vh-2rem)]"
+              onClick={(event) => event.stopPropagation()}
+            >
 
-            <div className="flex items-center justify-between">
+            {/* HEADER MODALE */}
+<div className="shrink-0 border-b px-5 py-4 sm:px-6">
+  <div className="flex items-start justify-between gap-4">
 
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Nuova asta
-                </h2>
+    <div className="min-w-0">
+      <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
+        Nuova asta
+      </h2>
 
-                <p className="mt-1 text-sm text-gray-500">
-                  Seleziona il ruolo del prossimo giocatore.
-                </p>
-              </div>
+      <p className="mt-1 text-sm text-gray-500">
+        Seleziona il ruolo del prossimo giocatore.
+      </p>
+    </div>
 
-              <button
-                type="button"
-                onClick={closeAuctionModal}
-                className="rounded-lg px-3 py-2 text-xl text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
-                aria-label="Chiudi"
-              >
-                ×
-              </button>
+    <button
+      type="button"
+      onClick={closeAuctionModal}
+      className="shrink-0 rounded-lg px-3 py-2 text-xl text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+      aria-label="Chiudi"
+    >
+      ×
+    </button>
 
-            </div>
+  </div>
+</div>
 
-            <div className="mt-6">
+<div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            {/* RUOLI */}
+            <div className="mt-5 sm:mt-6">
 
               <p className="mb-3 text-sm font-medium text-gray-700">
                 Ruolo
@@ -628,7 +637,7 @@ export default function AstaPage() {
                     key={role.value}
                     type="button"
                     onClick={() => setSelectedRole(role.value)}
-                    className={`rounded-xl border p-4 text-center transition ${
+                    className={`rounded-xl border p-3 text-center transition sm:p-4 ${
                       selectedRole === role.value
                         ? "border-black bg-black text-white"
                         : "border-gray-200 bg-white text-gray-900 hover:border-gray-400"
@@ -649,8 +658,9 @@ export default function AstaPage() {
               </div>
             </div>
 
-            <div className="mt-6 border-t pt-5">
+            <div className="mt-5 border-t pt-5 sm:mt-6">
 
+              {/* ESTRAZIONE */}
               <button
                 type="button"
                 onClick={drawPlayer}
@@ -666,8 +676,9 @@ export default function AstaPage() {
                     }`}
               </button>
 
+              {/* GIOCATORE ESTRATTO */}
               {selectedPlayer && (
-                <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
+                <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:mt-6 sm:p-5">
 
                   <div className="text-center">
 
@@ -675,11 +686,11 @@ export default function AstaPage() {
                       Giocatore estratto
                     </p>
 
-                    <h3 className="mt-2 text-3xl font-bold text-gray-900">
+                    <h3 className="mt-2 break-words text-2xl font-bold text-gray-900 sm:text-3xl">
                       {selectedPlayer.name}
                     </h3>
 
-                    <p className="mt-1 text-gray-600">
+                    <p className="mt-1 text-sm text-gray-600 sm:text-base">
                       {selectedPlayer.team ??
                         "Squadra non disponibile"}
                       {" · "}
@@ -688,7 +699,7 @@ export default function AstaPage() {
 
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 sm:grid-cols-4">
 
                     <div className="rounded-lg bg-white p-3 text-center">
                       <p className="text-xs text-gray-500">
@@ -734,6 +745,7 @@ export default function AstaPage() {
                 </div>
               )}
 
+              {/* ASSEGNAZIONE */}
               {selectedPlayer && (
                 <div className="mt-4 space-y-4">
 
@@ -789,7 +801,7 @@ export default function AstaPage() {
                       type="button"
                       onClick={declinePlayer}
                       disabled={assigning}
-                      className="rounded-lg border border-red-300 px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-lg border border-red-300 px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       ❌ Rifiuta
                     </button>
@@ -802,7 +814,7 @@ export default function AstaPage() {
                         !selectedParticipantId ||
                         price === ""
                       }
-                      className="rounded-lg bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      className="w-full rounded-lg bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
                       {assigning
                         ? "Assegnazione..."
@@ -817,7 +829,9 @@ export default function AstaPage() {
             </div>
           </div>
         </div>
+        </div>
       )}
     </main>
   )
 }
+

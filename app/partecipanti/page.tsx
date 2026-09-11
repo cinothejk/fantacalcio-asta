@@ -24,12 +24,14 @@ export default function PartecipantiPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
-  const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null)
+  const [editingParticipantId, setEditingParticipantId] =
+    useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
   const [editingInitialCredits, setEditingInitialCredits] = useState("")
   const [editingRemainingCredits, setEditingRemainingCredits] = useState("")
   const [editingSaving, setEditingSaving] = useState(false)
-  const [deletingParticipantId, setDeletingParticipantId] = useState<string | null>(null)
+  const [deletingParticipantId, setDeletingParticipantId] =
+    useState<string | null>(null)
 
   async function loadAuction() {
     if (!auctionId) return
@@ -95,7 +97,9 @@ export default function PartecipantiPage() {
     }
 
     if (!Number.isInteger(initialCredits) || initialCredits < 0) {
-      setError("I crediti devono essere un numero intero maggiore o uguale a 0.")
+      setError(
+        "I crediti devono essere un numero intero maggiore o uguale a 0."
+      )
       return
     }
 
@@ -153,12 +157,16 @@ export default function PartecipantiPage() {
       !Number.isInteger(remainingCredits) ||
       remainingCredits < 0
     ) {
-      setError("I crediti devono essere numeri interi maggiori o uguali a 0.")
+      setError(
+        "I crediti devono essere numeri interi maggiori o uguali a 0."
+      )
       return
     }
 
     if (remainingCredits > initialCredits) {
-      setError("I crediti residui non possono essere superiori ai crediti iniziali.")
+      setError(
+        "I crediti residui non possono essere superiori ai crediti iniziali."
+      )
       return
     }
 
@@ -187,7 +195,7 @@ export default function PartecipantiPage() {
   async function deleteParticipant(participant: Participant) {
     const confirmed = window.confirm(
       `Sei sicuro di voler eliminare "${participant.name}"?\n\n` +
-      "Il partecipante può essere eliminato solo se non ha ancora effettuato acquisti."
+        "Il partecipante può essere eliminato solo se non ha ancora effettuato acquisti."
     )
 
     if (!confirmed) {
@@ -220,14 +228,15 @@ export default function PartecipantiPage() {
   if (!auctionId) {
     return (
       <main className="min-h-screen bg-gray-100">
-        <div className="mx-auto max-w-5xl px-6 py-10">
-          <div className="rounded-xl bg-white p-6 shadow-sm">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+          <div className="rounded-xl bg-white p-5 shadow-sm sm:p-6">
             <h1 className="text-2xl font-bold text-gray-900">
               Nessuna asta selezionata
             </h1>
 
-            <p className="mt-2 text-gray-600">
-              Torna alla Home e apri un&apos;asta prima di gestire i partecipanti.
+            <p className="mt-2 text-sm text-gray-600 sm:text-base">
+              Torna alla Home e apri un&apos;asta prima di gestire i
+              partecipanti.
             </p>
           </div>
         </div>
@@ -237,28 +246,30 @@ export default function PartecipantiPage() {
 
   return (
     <main className="min-h-screen bg-gray-100">
-      <div className="mx-auto max-w-5xl px-6 py-10">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
 
-        <div className="mb-8">
+        {/* HEADER */}
+        <div className="mb-7 sm:mb-8">
           <p className="text-sm font-medium text-gray-500">
             Asta
           </p>
 
-          <h1 className="mt-1 text-3xl font-bold text-gray-900">
+          <h1 className="mt-1 break-words text-2xl font-bold text-gray-900 sm:text-3xl">
             {auctionName || "Caricamento..."}
           </h1>
 
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-sm text-gray-600 sm:text-base">
             Gestisci i partecipanti di questa asta.
           </p>
         </div>
 
-        <section className="rounded-xl bg-white p-6 shadow-sm">
+        {/* NUOVO PARTECIPANTE */}
+        <section className="rounded-xl bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-xl font-semibold text-gray-900">
             Nuovo partecipante
           </h2>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-6">
 
             <div>
               <label
@@ -306,36 +317,42 @@ export default function PartecipantiPage() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-black px-5 py-3 font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-black px-5 py-3 font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              {saving ? "Salvataggio..." : "+ Aggiungi partecipante"}
+              {saving
+                ? "Salvataggio..."
+                : "+ Aggiungi partecipante"}
             </button>
           </form>
         </section>
 
+        {/* PARTECIPANTI */}
         <section className="mt-8">
           <h2 className="text-xl font-semibold text-gray-900">
             Partecipanti registrati
           </h2>
 
           {loading ? (
-            <p className="mt-4 text-gray-500">
+            <p className="mt-4 text-sm text-gray-500 sm:text-base">
               Caricamento...
             </p>
           ) : participants.length === 0 ? (
-            <div className="mt-4 rounded-xl bg-white p-6 text-gray-500 shadow-sm">
+            <div className="mt-4 rounded-xl bg-white p-5 text-sm text-gray-500 shadow-sm sm:p-6 sm:text-base">
               Nessun partecipante inserito in questa asta.
             </div>
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {participants.map((participant) => {
-                const isEditing = editingParticipantId === participant.id
-                const isDeleting = deletingParticipantId === participant.id
+                const isEditing =
+                  editingParticipantId === participant.id
+
+                const isDeleting =
+                  deletingParticipantId === participant.id
 
                 return (
                   <div
                     key={participant.id}
-                    className="rounded-xl bg-white p-5 shadow-sm"
+                    className="rounded-xl bg-white p-5 shadow-sm sm:p-6"
                   >
                     {isEditing ? (
                       <>
@@ -356,7 +373,7 @@ export default function PartecipantiPage() {
                               onChange={(event) =>
                                 setEditingName(event.target.value)
                               }
-                              className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-gray-500"
+                              className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-gray-500 sm:py-2"
                             />
                           </div>
 
@@ -371,9 +388,11 @@ export default function PartecipantiPage() {
                               step="1"
                               value={editingInitialCredits}
                               onChange={(event) =>
-                                setEditingInitialCredits(event.target.value)
+                                setEditingInitialCredits(
+                                  event.target.value
+                                )
                               }
-                              className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-gray-500"
+                              className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-gray-500 sm:py-2"
                             />
                           </div>
 
@@ -388,26 +407,32 @@ export default function PartecipantiPage() {
                               step="1"
                               value={editingRemainingCredits}
                               onChange={(event) =>
-                                setEditingRemainingCredits(event.target.value)
+                                setEditingRemainingCredits(
+                                  event.target.value
+                                )
                               }
-                              className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-gray-500"
+                              className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-gray-500 sm:py-2"
                             />
                           </div>
                         </div>
 
-                        <div className="mt-5 flex gap-2">
+                        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                           <button
-                            onClick={() => saveParticipant(participant.id)}
+                            onClick={() =>
+                              saveParticipant(participant.id)
+                            }
                             disabled={editingSaving}
-                            className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full rounded-lg bg-black px-4 py-3 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
                           >
-                            {editingSaving ? "Salvataggio..." : "Salva"}
+                            {editingSaving
+                              ? "Salvataggio..."
+                              : "Salva"}
                           </button>
 
                           <button
                             onClick={cancelEditing}
                             disabled={editingSaving}
-                            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
                           >
                             Annulla
                           </button>
@@ -415,7 +440,7 @@ export default function PartecipantiPage() {
                       </>
                     ) : (
                       <>
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="break-words text-lg font-semibold text-gray-900">
                           {participant.name}
                         </h3>
 
@@ -439,21 +464,32 @@ export default function PartecipantiPage() {
                           </span>
                         </div>
 
-                        <div className="mt-5 flex gap-2">
+                        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                           <button
-                            onClick={() => startEditing(participant)}
-                            disabled={deletingParticipantId !== null}
-                            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() =>
+                              startEditing(participant)
+                            }
+                            disabled={
+                              deletingParticipantId !== null
+                            }
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
                           >
                             ✏️ Modifica
                           </button>
 
                           <button
-                            onClick={() => deleteParticipant(participant)}
-                            disabled={isDeleting || deletingParticipantId !== null}
-                            className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() =>
+                              deleteParticipant(participant)
+                            }
+                            disabled={
+                              isDeleting ||
+                              deletingParticipantId !== null
+                            }
+                            className="w-full rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
                           >
-                            {isDeleting ? "Eliminazione..." : "🗑️ Elimina"}
+                            {isDeleting
+                              ? "Eliminazione..."
+                              : "🗑️ Elimina"}
                           </button>
                         </div>
                       </>

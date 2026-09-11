@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -41,55 +42,52 @@ export default function Home() {
     setLoading(false)
   }
 
+  async function createAuction() {
+    const name = auctionName.trim()
 
-async function createAuction() {
-  const name = auctionName.trim()
+    if (!name) {
+      setError("Inserisci un nome per l'asta.")
+      return
+    }
 
-  if (!name) {
-    setError("Inserisci un nome per l'asta.")
-    return
-  }
+    setCreating(true)
+    setError("")
 
-  setCreating(true)
-  setError("")
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    if (!user) {
+      setError("Utente non autenticato.")
+      setCreating(false)
+      return
+    }
 
-  if (!user) {
-    setError("Utente non autenticato.")
+    const {
+      data: auction,
+      error,
+    } = await supabase
+      .from("auctions")
+      .insert({
+        user_id: user.id,
+        name,
+      })
+      .select("id")
+      .single()
+
+    if (error) {
+      console.error(error)
+      setError("Errore nella creazione dell'asta.")
+      setCreating(false)
+      return
+    }
+
+    setAuctionName("")
+    setShowNewAuction(false)
     setCreating(false)
-    return
+
+    window.location.href = `/partecipanti?auction=${auction.id}`
   }
-
-  const {
-    data: auction,
-    error,
-  } = await supabase
-    .from("auctions")
-    .insert({
-      user_id: user.id,
-      name,
-    })
-    .select("id")
-    .single()
-
-  if (error) {
-    console.error(error)
-    setError("Errore nella creazione dell'asta.")
-    setCreating(false)
-    return
-  }
-
-  setAuctionName("")
-  setShowNewAuction(false)
-  setCreating(false)
-
-  window.location.href = `/partecipanti?auction=${auction.id}`
-}
-
-
 
   async function deleteAuction(auction: Auction) {
     const confirmed = window.confirm(
@@ -118,7 +116,9 @@ async function createAuction() {
     }
 
     setAuctions((currentAuctions) =>
-      currentAuctions.filter((currentAuction) => currentAuction.id !== auction.id)
+      currentAuctions.filter(
+        (currentAuction) => currentAuction.id !== auction.id
+      )
     )
 
     setDeletingAuctionId(null)
@@ -126,34 +126,35 @@ async function createAuction() {
 
   return (
     <main className="min-h-screen bg-gray-100">
-      <div className="mx-auto max-w-5xl px-6 py-10">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
 
-        <header className="mb-10">
-
+        {/* HEADER */}
+        <header className="mb-8 sm:mb-10">
           <div className="flex items-center gap-3">
-  <Image
-    src="/logo.png"
-    alt="Fantacalcio"
-    width={64}
-    height={64}
-    priority
-    className="object-contain"
-  />
+            <Image
+              src="/logo.png"
+              alt="Fantacalcio"
+              width={64}
+              height={64}
+              priority
+              className="h-12 w-12 object-contain sm:h-16 sm:w-16"
+            />
 
-  <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-    Fantacalcio Asta
-  </h1>
-</div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Fantacalcio Asta
+            </h1>
+          </div>
 
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-sm text-gray-600 sm:text-base">
             Gestisci le tue aste di fantacalcio
           </p>
         </header>
 
         {/* ASTE */}
         <section className="mb-10">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">
+
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
               Le mie aste
             </h2>
 
@@ -162,7 +163,7 @@ async function createAuction() {
                 setShowNewAuction(true)
                 setError("")
               }}
-              className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
+              className="shrink-0 rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 sm:px-4"
             >
               + Nuova asta
             </button>
@@ -175,13 +176,13 @@ async function createAuction() {
           )}
 
           {loading ? (
-            <div className="rounded-xl bg-white p-6 shadow-sm">
-              <p className="text-gray-500">
+            <div className="rounded-xl bg-white p-5 shadow-sm sm:p-6">
+              <p className="text-sm text-gray-500 sm:text-base">
                 Caricamento aste...
               </p>
             </div>
           ) : auctions.length === 0 ? (
-            <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+            <div className="rounded-xl bg-white p-6 text-center shadow-sm sm:p-8">
               <p className="text-lg font-semibold text-gray-900">
                 Nessuna asta presente
               </p>
@@ -192,7 +193,7 @@ async function createAuction() {
 
               <button
                 onClick={() => setShowNewAuction(true)}
-                className="mt-5 rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+                className="mt-5 w-full rounded-lg bg-black px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800 sm:w-auto sm:py-2.5"
               >
                 + Crea nuova asta
               </button>
@@ -205,9 +206,9 @@ async function createAuction() {
                 return (
                   <div
                     key={auction.id}
-                    className="rounded-xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                    className="rounded-xl bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-6"
                   >
-                    <h3 className="text-xl font-semibold text-gray-900">
+                    <h3 className="break-words text-xl font-semibold text-gray-900">
                       🏆 {auction.name}
                     </h3>
 
@@ -218,20 +219,24 @@ async function createAuction() {
                         : "partecipanti"}
                     </p>
 
-                    <div className="mt-5 flex flex-wrap gap-2">
+                    <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <Link
                         href={`/asta?auction=${auction.id}`}
-                        className="rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+                        className="rounded-lg bg-black px-5 py-3 text-center text-sm font-semibold text-white hover:bg-gray-800 sm:py-2.5"
                       >
                         Apri asta →
                       </Link>
 
                       <button
                         onClick={() => deleteAuction(auction)}
-                        disabled={isDeleting || deletingAuctionId !== null}
-                        className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={
+                          isDeleting || deletingAuctionId !== null
+                        }
+                        className="rounded-lg border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:py-2.5"
                       >
-                        {isDeleting ? "Cancellazione..." : "🗑️ Cancella"}
+                        {isDeleting
+                          ? "Cancellazione..."
+                          : "🗑️ Cancella"}
                       </button>
                     </div>
                   </div>
@@ -243,8 +248,8 @@ async function createAuction() {
 
         {/* MODALE NUOVA ASTA */}
         {showNewAuction && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6">
 
               <h2 className="text-2xl font-bold text-gray-900">
                 Nuova asta
@@ -274,14 +279,14 @@ async function createAuction() {
                 </p>
               )}
 
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
                 <button
                   onClick={() => {
                     setShowNewAuction(false)
                     setAuctionName("")
                     setError("")
                   }}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:py-2"
                 >
                   Annulla
                 </button>
@@ -289,11 +294,12 @@ async function createAuction() {
                 <button
                   onClick={createAuction}
                   disabled={creating}
-                  className="rounded-lg bg-black px-5 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-black px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 sm:py-2"
                 >
                   {creating ? "Creazione..." : "Crea asta"}
                 </button>
               </div>
+
             </div>
           </div>
         )}
