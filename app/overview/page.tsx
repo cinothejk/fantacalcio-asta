@@ -8,23 +8,23 @@ import { supabase } from "@/lib/supabase/client"
 type Role = "P" | "D" | "C" | "A"
 
 type Participant = {
-id: string
-name: string
-initial_credits: number
-remaining_credits: number
+  id: string
+  name: string
+  initial_credits: number
+  remaining_credits: number
 }
 
 type Purchase = {
-id: string
-participant_id: string
-player_id: string
-price: number
-created_at: string
-player: {
-name: string
-team: string | null
-role: Role
-} | null
+  id: string
+  participant_id: string
+  player_id: string
+  price: number
+  created_at: string
+  player: {
+    name: string
+    team: string | null
+    role: Role
+  } | null
 }
 
 type Player = {
@@ -50,837 +50,808 @@ export default function OverviewPage() {
     loadOverview()
   }, [auctionId])
 
-async function deletePurchase(purchaseId: string) {
-const confirmed = window.confirm(
-"Sei sicuro di voler eliminare questo acquisto?"
-)
+  async function deletePurchase(purchaseId: string) {
+    const confirmed = window.confirm(
+      "Sei sicuro di voler eliminare questo acquisto?"
+    )
 
+    if (!confirmed) {
+      return
+    }
 
-if (!confirmed) {
-  return
-}
+    setDeletingPurchaseId(purchaseId)
+    setError("")
 
-setDeletingPurchaseId(purchaseId)
-setError("")
+    const { error } = await supabase.rpc("delete_purchase", {
+      p_purchase_id: purchaseId,
+    })
 
-const { error } = await supabase.rpc("delete_purchase", {
-  p_purchase_id: purchaseId,
-})
+    if (error) {
+      setError(error.message)
+      setDeletingPurchaseId("")
+      return
+    }
 
-if (error) {
-  setError(error.message)
-  setDeletingPurchaseId("")
-  return
-}
-
-await loadOverview()
-setDeletingPurchaseId("")
-
-
-}
-
-async function loadOverview() {
-  setLoading(true)
-  setError("")
-
-  if (!auctionId) {
-    setError("Nessuna asta selezionata.")
-    setParticipants([])
-    setPurchases([])
-    setPlayers([])
-    setLoading(false)
-    return
+    await loadOverview()
+    setDeletingPurchaseId("")
   }
 
+  async function loadOverview() {
+    setLoading(true)
+    setError("")
 
-  const participantsResult = await supabase
-    .from("participants")
-    .select("id, name, initial_credits, remaining_credits")
-    .eq("auction_id", auctionId)
-    .order("created_at", { ascending: true })
+    if (!auctionId) {
+      setError("Nessuna asta selezionata.")
+      setParticipants([])
+      setPurchases([])
+      setPlayers([])
+      setLoading(false)
+      return
+    }
 
-if (participantsResult.error) {
-  setError(participantsResult.error.message)
-  setLoading(false)
-  return
-}
+    const participantsResult = await supabase
+      .from("participants")
+      .select("id, name, initial_credits, remaining_credits")
+      .eq("auction_id", auctionId)
+      .order("created_at", { ascending: true })
 
-  const purchasesResult = await supabase
-    .from("purchases")
-    .select(`
-      id,
-      participant_id,
-      player_id,
-      auction_id,
-      price,
-      created_at,
-      player:players (
+    if (participantsResult.error) {
+      setError(participantsResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    const purchasesResult = await supabase
+      .from("purchases")
+      .select(`
+        id,
+        participant_id,
+        player_id,
+        auction_id,
+        price,
+        created_at,
+        player:players (
+          name,
+          team,
+          role
+        )
+      `)
+      .eq("auction_id", auctionId)
+      .order("created_at", { ascending: true })
+
+    if (purchasesResult.error) {
+      setError(purchasesResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    const playersResult = await supabase
+      .from("players")
+      .select(`
+        id,
         name,
         team,
-        role
+        role,
+        auction_players!inner(
+          status
+        )
+      `)
+      .eq("auction_players.auction_id", auctionId)
+      .order("name", { ascending: true })
+
+    if (playersResult.error) {
+      setError(playersResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    setParticipants(participantsResult.data ?? [])
+
+    setPurchases(
+      (purchasesResult.data ?? []).map((purchase) => ({
+        ...purchase,
+        player: Array.isArray(purchase.player)
+          ? purchase.player[0] ?? null
+          : purchase.player,
+      })) as Purchase[]
+    )
+
+    setPlayers(
+      (playersResult.data ?? []).map((player) => {
+        const auctionPlayer = Array.isArray(player.auction_players)
+          ? player.auction_players[0]
+          : player.auction_players
+
+        return {
+          id: player.id,
+          name: player.name,
+          team: player.team,
+          role: player.role,
+          status: auctionPlayer?.status ?? "available",
+        }
+      })
+    )
+
+    setLoading(false)
+  }
+
+  function getParticipantPurchases(participantId: string) {
+    return purchases.filter(
+      (purchase) => purchase.participant_id === participantId
+    )
+  }
+
+  function getSpentCredits(participantId: string) {
+    return getParticipantPurchases(participantId).reduce(
+      (total, purchase) => total + purchase.price,
+      0
+    )
+  }
+
+  function getRoleCount(participantId: string, role: Role) {
+    return getParticipantPurchases(participantId).filter(
+      (purchase) => purchase.player?.role === role
+    ).length
+  }
+
+  function exportAuction() {
+    const participantsSheet = participants.map((participant) => {
+      const participantPurchases = purchases.filter(
+        (purchase) => purchase.participant_id === participant.id
       )
-    `)
-    .eq("auction_id", auctionId)
-    .order("created_at", { ascending: true })
 
-if (purchasesResult.error) {
-  setError(purchasesResult.error.message)
-  setLoading(false)
-  return
-}
-
-  const playersResult = await supabase
-    .from("players")
-    .select(`
-      id,
-      name,
-      team,
-      role,
-      auction_players!inner(
-        status
+      const spent = participantPurchases.reduce(
+        (total, purchase) => total + purchase.price,
+        0
       )
-    `)
-    .eq("auction_players.auction_id", auctionId)
-    .order("name", { ascending: true })
-
-if (playersResult.error) {
-  setError(playersResult.error.message)
-  setLoading(false)
-  return
-}
-
-setParticipants(participantsResult.data ?? [])
-
-setPurchases(
-    (purchasesResult.data ?? []).map((purchase) => ({
-      ...purchase,
-      player: Array.isArray(purchase.player)
-        ? purchase.player[0] ?? null
-        : purchase.player,
-    })) as Purchase[]
-  )
-
-  setPlayers(
-    (playersResult.data ?? []).map((player) => {
-      const auctionPlayer = Array.isArray(player.auction_players)
-        ? player.auction_players[0]
-        : player.auction_players
 
       return {
-        id: player.id,
-        name: player.name,
-        team: player.team,
-        role: player.role,
-        status:
-          auctionPlayer?.status ?? "available",
+        Partecipante: participant.name,
+        "Crediti iniziali": participant.initial_credits,
+        "Crediti spesi": spent,
+        "Crediti rimanenti": participant.remaining_credits,
+        "Giocatori acquistati": participantPurchases.length,
       }
     })
-  )
 
-setLoading(false)
+    const rosesSheet = purchases.map((purchase) => {
+      const participant = participants.find(
+        (item) => item.id === purchase.participant_id
+      )
 
+      return {
+        Partecipante: participant?.name ?? "",
+        Giocatore: purchase.player?.name ?? "",
+        Squadra: purchase.player?.team ?? "",
+        Ruolo: purchase.player?.role ?? "",
+        Prezzo: purchase.price,
+        "Data acquisto": new Date(
+          purchase.created_at
+        ).toLocaleString("it-IT"),
+      }
+    })
 
-}
+    const rolesSheet = participants.map((participant) => {
+      const participantPurchases = purchases.filter(
+        (purchase) => purchase.participant_id === participant.id
+      )
 
-function getParticipantPurchases(participantId: string) {
-return purchases.filter(
-(purchase) => purchase.participant_id === participantId
-)
-}
+      return {
+        Partecipante: participant.name,
+        P: participantPurchases.filter(
+          (purchase) => purchase.player?.role === "P"
+        ).length,
+        D: participantPurchases.filter(
+          (purchase) => purchase.player?.role === "D"
+        ).length,
+        C: participantPurchases.filter(
+          (purchase) => purchase.player?.role === "C"
+        ).length,
+        A: participantPurchases.filter(
+          (purchase) => purchase.player?.role === "A"
+        ).length,
+        Totale: participantPurchases.length,
+      }
+    })
 
-function getSpentCredits(participantId: string) {
-return getParticipantPurchases(participantId).reduce(
-(total, purchase) => total + purchase.price,
-0
-)
-}
+    const playersSheet = players.map((player) => {
+      const purchase = purchases.find(
+        (item) => item.player_id === player.id
+      )
 
-function getRoleCount(
-participantId: string,
-role: Role
-) {
-return getParticipantPurchases(participantId).filter(
-(purchase) => purchase.player?.role === role
-).length
-}
+      const participant = purchase
+        ? participants.find(
+            (item) => item.id === purchase.participant_id
+          )
+        : null
 
-function exportAuction() {
-const participantsSheet = participants.map((participant) => {
-const participantPurchases = purchases.filter(
-(purchase) => purchase.participant_id === participant.id
-)
+      return {
+        Giocatore: player.name,
+        Squadra: player.team ?? "",
+        Ruolo: player.role,
+        Stato:
+          player.status === "sold"
+            ? "Acquistato"
+            : player.status === "declined"
+              ? "Rifiutato"
+              : "Disponibile",
+        Partecipante: participant?.name ?? "",
+        Prezzo: purchase?.price ?? "",
+      }
+    })
 
+    const workbook = XLSX.utils.book_new()
 
-  const spent = participantPurchases.reduce(
+    const participantsWorksheet =
+      XLSX.utils.json_to_sheet(participantsSheet)
+
+    const rosesWorksheet =
+      XLSX.utils.json_to_sheet(rosesSheet)
+
+    const rolesWorksheet =
+      XLSX.utils.json_to_sheet(rolesSheet)
+
+    const playersWorksheet =
+      XLSX.utils.json_to_sheet(playersSheet)
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      participantsWorksheet,
+      "Partecipanti"
+    )
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      rosesWorksheet,
+      "Rose"
+    )
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      rolesWorksheet,
+      "Ruoli"
+    )
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      playersWorksheet,
+      "Giocatori"
+    )
+
+    const date = new Date()
+      .toISOString()
+      .slice(0, 10)
+
+    XLSX.writeFile(
+      workbook,
+      `fantacalcio-situazione-asta-${date}.xlsx`
+    )
+  }
+
+  const totalSpent = purchases.reduce(
     (total, purchase) => total + purchase.price,
     0
   )
 
-  return {
-    Partecipante: participant.name,
-    "Crediti iniziali": participant.initial_credits,
-    "Crediti spesi": spent,
-    "Crediti rimanenti": participant.remaining_credits,
-    "Giocatori acquistati": participantPurchases.length,
-  }
-})
+  const totalPlayers = purchases.length
 
-const rosesSheet = purchases.map((purchase) => {
-  const participant = participants.find(
-    (item) => item.id === purchase.participant_id
+  const totalRemainingCredits = participants.reduce(
+    (total, participant) =>
+      total + participant.remaining_credits,
+    0
   )
 
-  return {
-    Partecipante: participant?.name ?? "",
-    Giocatore: purchase.player?.name ?? "",
-    Squadra: purchase.player?.team ?? "",
-    Ruolo: purchase.player?.role ?? "",
-    Prezzo: purchase.price,
-    "Data acquisto": new Date(
-      purchase.created_at
-    ).toLocaleString("it-IT"),
-  }
-})
+  const averagePrice =
+    totalPlayers > 0
+      ? Math.round(totalSpent / totalPlayers)
+      : 0
 
-const rolesSheet = participants.map((participant) => {
-  const participantPurchases = purchases.filter(
-    (purchase) => purchase.participant_id === participant.id
+  const highestPrice =
+    totalPlayers > 0
+      ? Math.max(...purchases.map((purchase) => purchase.price))
+      : 0
+
+  const highestPurchase =
+    purchases.find(
+      (purchase) => purchase.price === highestPrice
+    ) ?? null
+
+  const sortedParticipants = [...participants].sort(
+    (a, b) =>
+      getSpentCredits(b.id) -
+      getSpentCredits(a.id)
   )
 
-  return {
-    Partecipante: participant.name,
-    P: participantPurchases.filter(
+  const roleTotals: Record<Role, number> = {
+    P: purchases.filter(
       (purchase) => purchase.player?.role === "P"
     ).length,
-    D: participantPurchases.filter(
+
+    D: purchases.filter(
       (purchase) => purchase.player?.role === "D"
     ).length,
-    C: participantPurchases.filter(
+
+    C: purchases.filter(
       (purchase) => purchase.player?.role === "C"
     ).length,
-    A: participantPurchases.filter(
+
+    A: purchases.filter(
       (purchase) => purchase.player?.role === "A"
     ).length,
-    Totale: participantPurchases.length,
   }
-})
 
-const playersSheet = players.map((player) => {
-  const purchase = purchases.find(
-    (item) => item.player_id === player.id
-  )
-
-  const participant = purchase
-    ? participants.find(
-        (item) => item.id === purchase.participant_id
-      )
-    : null
-
-  return {
-    Giocatore: player.name,
-    Squadra: player.team ?? "",
-    Ruolo: player.role,
-    Stato:
-      player.status === "sold"
-        ? "Acquistato"
-        : player.status === "declined"
-          ? "Rifiutato"
-          : "Disponibile",
-    Partecipante: participant?.name ?? "",
-    Prezzo: purchase?.price ?? "",
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gray-50 px-4 py-6 sm:p-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-sm text-gray-500 sm:text-base">
+            Caricamento overview...
+          </p>
+        </div>
+      </main>
+    )
   }
-})
 
-const workbook = XLSX.utils.book_new()
+  return (
+    <main className="min-h-screen bg-gray-50 px-4 py-6 sm:p-6">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold leading-tight text-gray-900 sm:text-3xl">
+              Overview asta
+            </h1>
 
-const participantsWorksheet =
-  XLSX.utils.json_to_sheet(participantsSheet)
-
-const rosesWorksheet =
-  XLSX.utils.json_to_sheet(rosesSheet)
-
-const rolesWorksheet =
-  XLSX.utils.json_to_sheet(rolesSheet)
-
-const playersWorksheet =
-  XLSX.utils.json_to_sheet(playersSheet)
-
-XLSX.utils.book_append_sheet(
-  workbook,
-  participantsWorksheet,
-  "Partecipanti"
-)
-
-XLSX.utils.book_append_sheet(
-  workbook,
-  rosesWorksheet,
-  "Rose"
-)
-
-XLSX.utils.book_append_sheet(
-  workbook,
-  rolesWorksheet,
-  "Ruoli"
-)
-
-XLSX.utils.book_append_sheet(
-  workbook,
-  playersWorksheet,
-  "Giocatori"
-)
-
-const date = new Date()
-  .toISOString()
-  .slice(0, 10)
-
-XLSX.writeFile(
-  workbook,
-  `fantacalcio-situazione-asta-${date}.xlsx`
-)
-
-
-}
-
-const totalSpent = purchases.reduce(
-(total, purchase) => total + purchase.price,
-0
-)
-
-const totalPlayers = purchases.length
-
-const totalRemainingCredits = participants.reduce(
-(total, participant) =>
-total + participant.remaining_credits,
-0
-)
-
-const averagePrice =
-totalPlayers > 0
-? Math.round(totalSpent / totalPlayers)
-: 0
-
-const highestPrice =
-totalPlayers > 0
-? Math.max(...purchases.map((purchase) => purchase.price))
-: 0
-
-const highestPurchase =
-purchases.find(
-(purchase) => purchase.price === highestPrice
-) ?? null
-
-const sortedParticipants = [...participants].sort(
-(a, b) =>
-getSpentCredits(b.id) -
-getSpentCredits(a.id)
-)
-
-const roleTotals: Record<Role, number> = {
-P: purchases.filter(
-(purchase) => purchase.player?.role === "P"
-).length,
-
-
-D: purchases.filter(
-  (purchase) => purchase.player?.role === "D"
-).length,
-
-C: purchases.filter(
-  (purchase) => purchase.player?.role === "C"
-).length,
-
-A: purchases.filter(
-  (purchase) => purchase.player?.role === "A"
-).length,
-
-
-}
-
-if (loading) {
-return ( <main className="min-h-screen bg-gray-50 p-6"> <div className="mx-auto max-w-7xl"> <p className="text-gray-500">
-Caricamento overview... </p> </div> </main>
-)
-}
-
-return ( <main className="min-h-screen bg-gray-50 p-6"> <div className="mx-auto max-w-7xl">
-
-
-    {/* Header */}
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          Overview asta
-        </h1>
-
-        <p className="mt-1 text-gray-500">
-          Situazione globale dell'asta
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={exportAuction}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
-        >
-          📥 Esporta situazione asta
-        </button>
-
-        <button
-          type="button"
-          onClick={loadOverview}
-          className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
-        >
-          ↻ Aggiorna
-        </button>
-      </div>
-    </div>
-
-    {/* Errore */}
-    {error && (
-      <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        {error}
-      </div>
-    )}
-
-    {participants.length === 0 ? (
-      <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
-        Nessun partecipante presente.
-      </div>
-    ) : (
-      <>
-        {/* Statistiche principali */}
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              Partecipanti
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {participants.length}
+            <p className="mt-1 text-sm text-gray-500 sm:text-base">
+              Situazione globale dell&apos;asta
             </p>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              Giocatori acquistati
-            </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={exportAuction}
+              className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
+            >
+              📥 Esporta situazione asta
+            </button>
 
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {totalPlayers}
-            </p>
+            <button
+              type="button"
+              onClick={loadOverview}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100 sm:w-auto"
+            >
+              ↻ Aggiorna
+            </button>
           </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              Crediti spesi
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {totalSpent}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              Crediti disponibili
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {totalRemainingCredits}
-            </p>
-          </div>
-
         </div>
 
-        {/* Statistiche asta */}
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              🏆 Maggiore spesa
-            </p>
-
-            <p className="mt-2 text-xl font-bold text-gray-900">
-              {sortedParticipants[0]?.name ?? "-"}
-            </p>
-
-            <p className="mt-1 text-sm text-gray-500">
-              {sortedParticipants[0]
-                ? `${getSpentCredits(
-                    sortedParticipants[0].id
-                  )} crediti spesi`
-                : "-"}
-            </p>
+        {/* Errore */}
+        {error && (
+          <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-5 text-red-700 sm:mt-6">
+            {error}
           </div>
+        )}
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              💰 Prezzo medio
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {averagePrice}
-            </p>
-
-            <p className="mt-1 text-sm text-gray-500">
-              crediti per giocatore
-            </p>
+        {participants.length === 0 ? (
+          <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500 sm:mt-8 sm:p-8">
+            Nessun partecipante presente.
           </div>
+        ) : (
+          <>
+            {/* Statistiche principali */}
+            <div className="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  Partecipanti
+                </p>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-500">
-              🔥 Acquisto più costoso
-            </p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                  {participants.length}
+                </p>
+              </div>
 
-            <p className="mt-2 text-xl font-bold text-gray-900">
-              {highestPurchase?.player?.name ?? "-"}
-            </p>
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  Giocatori acquistati
+                </p>
 
-            <p className="mt-1 text-sm text-gray-500">
-              {highestPrice > 0
-                ? `${highestPrice} crediti`
-                : "-"}
-            </p>
-          </div>
+                <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                  {totalPlayers}
+                </p>
+              </div>
 
-        </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  Crediti spesi
+                </p>
 
-        {/* Ruoli */}
-        <section className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-xl font-bold text-gray-900">
-            Giocatori acquistati per ruolo
-          </h2>
+                <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                  {totalSpent}
+                </p>
+              </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  Crediti disponibili
+                </p>
 
-            <div className="rounded-xl bg-gray-50 p-4 text-center">
-              <p className="text-sm font-semibold text-gray-500">
-                P
-              </p>
-
-              <p className="mt-2 text-3xl font-bold text-gray-900">
-                {roleTotals.P}
-              </p>
-
-              <p className="mt-1 text-xs text-gray-500">
-                Portieri
-              </p>
+                <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                  {totalRemainingCredits}
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-xl bg-gray-50 p-4 text-center">
-              <p className="text-sm font-semibold text-gray-500">
-                D
-              </p>
+            {/* Statistiche asta */}
+            <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  🏆 Maggiore spesa
+                </p>
 
-              <p className="mt-2 text-3xl font-bold text-gray-900">
-                {roleTotals.D}
-              </p>
+                <p className="mt-2 truncate text-lg font-bold text-gray-900 sm:text-xl">
+                  {sortedParticipants[0]?.name ?? "-"}
+                </p>
 
-              <p className="mt-1 text-xs text-gray-500">
-                Difensori
-              </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {sortedParticipants[0]
+                    ? `${getSpentCredits(
+                        sortedParticipants[0].id
+                      )} crediti spesi`
+                    : "-"}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  💰 Prezzo medio
+                </p>
+
+                <p className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
+                  {averagePrice}
+                </p>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  crediti per giocatore
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500">
+                  🔥 Acquisto più costoso
+                </p>
+
+                <p className="mt-2 truncate text-lg font-bold text-gray-900 sm:text-xl">
+                  {highestPurchase?.player?.name ?? "-"}
+                </p>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  {highestPrice > 0
+                    ? `${highestPrice} crediti`
+                    : "-"}
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-xl bg-gray-50 p-4 text-center">
-              <p className="text-sm font-semibold text-gray-500">
-                C
-              </p>
+            {/* Ruoli */}
+            <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 sm:mt-8 sm:p-5">
+              <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
+                Giocatori acquistati per ruolo
+              </h2>
 
-              <p className="mt-2 text-3xl font-bold text-gray-900">
-                {roleTotals.C}
-              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+                <div className="rounded-xl bg-gray-50 p-3 text-center sm:p-4">
+                  <p className="text-sm font-semibold text-gray-500">
+                    P
+                  </p>
 
-              <p className="mt-1 text-xs text-gray-500">
-                Centrocampisti
-              </p>
-            </div>
+                  <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                    {roleTotals.P}
+                  </p>
 
-            <div className="rounded-xl bg-gray-50 p-4 text-center">
-              <p className="text-sm font-semibold text-gray-500">
-                A
-              </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Portieri
+                  </p>
+                </div>
 
-              <p className="mt-2 text-3xl font-bold text-gray-900">
-                {roleTotals.A}
-              </p>
+                <div className="rounded-xl bg-gray-50 p-3 text-center sm:p-4">
+                  <p className="text-sm font-semibold text-gray-500">
+                    D
+                  </p>
 
-              <p className="mt-1 text-xs text-gray-500">
-                Attaccanti
-              </p>
-            </div>
+                  <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                    {roleTotals.D}
+                  </p>
 
-          </div>
-        </section>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Difensori
+                  </p>
+                </div>
 
-        {/* Classifica spesa */}
-        <section className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-xl font-bold text-gray-900">
-            Classifica spesa
-          </h2>
+                <div className="rounded-xl bg-gray-50 p-3 text-center sm:p-4">
+                  <p className="text-sm font-semibold text-gray-500">
+                    C
+                  </p>
 
-          <div className="mt-5 space-y-3">
-            {sortedParticipants.map(
-              (participant, index) => {
-                const spent =
-                  getSpentCredits(participant.id)
+                  <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                    {roleTotals.C}
+                  </p>
 
-                const playerCount =
-                  getParticipantPurchases(
-                    participant.id
-                  ).length
+                  <p className="mt-1 text-xs text-gray-500">
+                    Centrocampisti
+                  </p>
+                </div>
 
-                return (
-                  <div
-                    key={participant.id}
-                    className="flex items-center justify-between gap-4 rounded-lg bg-gray-50 p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-gray-600">
-                        {index + 1}
-                      </div>
+                <div className="rounded-xl bg-gray-50 p-3 text-center sm:p-4">
+                  <p className="text-sm font-semibold text-gray-500">
+                    A
+                  </p>
 
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {participant.name}
-                        </p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900 sm:mt-2 sm:text-3xl">
+                    {roleTotals.A}
+                  </p>
 
-                        <p className="text-sm text-gray-500">
-                          {playerCount}{" "}
-                          {playerCount === 1
-                            ? "giocatore"
-                            : "giocatori"}
-                        </p>
-                      </div>
-                    </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Attaccanti
+                  </p>
+                </div>
+              </div>
+            </section>
 
-                    <p className="text-lg font-bold text-gray-900">
-                      {spent} crediti
-                    </p>
-                  </div>
-                )
-              }
-            )}
-          </div>
-        </section>
+            {/* Classifica spesa */}
+            <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 sm:mt-8 sm:p-5">
+              <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
+                Classifica spesa
+              </h2>
 
-        {/* Rose */}
-        <section className="mt-8">
-          <h2 className="text-xl font-bold text-gray-900">
-            Rose
-          </h2>
+              <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
+                {sortedParticipants.map(
+                  (participant, index) => {
+                    const spent =
+                      getSpentCredits(participant.id)
 
-          <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    const playerCount =
+                      getParticipantPurchases(
+                        participant.id
+                      ).length
 
-            {participants.map((participant) => {
-              const roleOrder: Record<Role, number> = {
-  P: 0,
-  D: 1,
-  C: 2,
-  A: 3,
-}
+                    return (
+                      <div
+                        key={participant.id}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3 sm:gap-4 sm:p-4"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-gray-600 sm:h-9 sm:w-9">
+                            {index + 1}
+                          </div>
 
-const participantPurchases =
-  [...getParticipantPurchases(participant.id)].sort(
-    (a, b) =>
-      roleOrder[a.player?.role ?? "A"] -
-      roleOrder[b.player?.role ?? "A"]
-  )
-              const spentCredits =
-                getSpentCredits(participant.id)
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-gray-900">
+                              {participant.name}
+                            </p>
 
-              return (
-                <section
-                  key={participant.id}
-                  className="overflow-hidden rounded-xl border border-gray-200 bg-white"
-                >
+                            <p className="text-xs text-gray-500 sm:text-sm">
+                              {playerCount}{" "}
+                              {playerCount === 1
+                                ? "giocatore"
+                                : "giocatori"}
+                            </p>
+                          </div>
+                        </div>
 
-                  {/* Dati partecipante */}
-                  <div className="border-b border-gray-200 p-5">
-                    <div className="flex items-start justify-between gap-4">
-
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          {participant.name}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          {participantPurchases.length}{" "}
-                          {participantPurchases.length === 1
-                            ? "giocatore"
-                            : "giocatori"}
+                        <p className="shrink-0 text-sm font-bold text-gray-900 sm:text-lg">
+                          {spent} crediti
                         </p>
                       </div>
+                    )
+                  }
+                )}
+              </div>
+            </section>
 
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">
-                          Crediti
-                        </p>
+            {/* Rose */}
+            <section className="mt-6 sm:mt-8">
+              <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
+                Rose
+              </h2>
 
-                        <p className="text-2xl font-bold text-gray-900">
-                          {participant.remaining_credits}
-                        </p>
-                      </div>
+              <div className="mt-4 grid gap-4 sm:mt-5 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {participants.map((participant) => {
+                  const roleOrder: Record<Role, number> = {
+                    P: 0,
+                    D: 1,
+                    C: 2,
+                    A: 3,
+                  }
 
-                    </div>
+                  const participantPurchases =
+                    [...getParticipantPurchases(participant.id)].sort(
+                      (a, b) =>
+                        roleOrder[a.player?.role ?? "A"] -
+                        roleOrder[b.player?.role ?? "A"]
+                    )
 
-                    {/* Ruoli */}
-                    <div className="mt-4 grid grid-cols-4 gap-2">
+                  const spentCredits =
+                    getSpentCredits(participant.id)
 
-                      {(["P", "D", "C", "A"] as Role[]).map(
-                        (role) => {
-                          const roleColors: Record<Role, string> = {
-                            P: "bg-orange-200",
-                            D: "bg-green-200",
-                            C: "bg-blue-200",
-                            A: "bg-red-200",
-                          }
+                  return (
+                    <section
+                      key={participant.id}
+                      className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+                    >
+                      {/* Dati partecipante */}
+                      <div className="border-b border-gray-200 p-4 sm:p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-lg font-bold text-gray-900 sm:text-xl">
+                              {participant.name}
+                            </h3>
 
-                          return (
-                            <div
-                              key={role}
-                              className={`rounded-lg p-2 text-center ${roleColors[role]}`}
-                            >
-                              <p className="text-xs font-bold text-gray-600">
-                                {role}
-                              </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {participantPurchases.length}{" "}
+                              {participantPurchases.length === 1
+                                ? "giocatore"
+                                : "giocatori"}
+                            </p>
+                          </div>
 
-                              <p className="mt-1 font-bold text-gray-900">
-                                {getRoleCount(
-                                  participant.id,
-                                  role
-                                )}
-                              </p>
-                            </div>
-                          )
-                        }
-                      )}
+                          <div className="shrink-0 text-right">
+                            <p className="text-xs text-gray-500">
+                              Crediti
+                            </p>
 
-                    </div>
+                            <p className="text-xl font-bold text-gray-900 sm:text-2xl">
+                              {participant.remaining_credits}
+                            </p>
+                          </div>
+                        </div>
 
-                    {/* Crediti */}
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        {/* Ruoli */}
+                        <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-2">
+                          {(["P", "D", "C", "A"] as Role[]).map(
+                            (role) => {
+                              const roleColors: Record<
+                                Role,
+                                string
+                              > = {
+                                P: "bg-orange-200",
+                                D: "bg-green-200",
+                                C: "bg-blue-200",
+                                A: "bg-red-200",
+                              }
 
-                      <div className="rounded-lg bg-gray-50 p-3">
-                        <p className="text-xs text-gray-500">
-                          Spesi
-                        </p>
-
-                        <p className="mt-1 font-bold text-gray-900">
-                          {spentCredits}
-                        </p>
-                      </div>
-
-                      <div className="rounded-lg bg-gray-50 p-3">
-                        <p className="text-xs text-gray-500">
-                          Budget iniziale
-                        </p>
-
-                        <p className="mt-1 font-bold text-gray-900">
-                          {participant.initial_credits}
-                        </p>
-                      </div>
-
-                    </div>
-                  </div>
-
-                  {/* Rosa */}
-                  <div className="p-5">
-                    <h4 className="font-semibold text-gray-900">
-                      Rosa
-                    </h4>
-
-                    {participantPurchases.length === 0 ? (
-                      <p className="mt-4 text-sm text-gray-500">
-                        Nessun giocatore acquistato.
-                      </p>
-                    ) : (
-                      <div className="mt-4 space-y-3">
-
-                        {participantPurchases.map(
-                          (purchase, index) => (
-                            <div
-                              key={purchase.id}
-                              className={`flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 ${
-                                purchase.player?.role === "P"
-                                  ? "bg-orange-200"
-                                  : purchase.player?.role === "D"
-                                    ? "bg-green-200"
-                                    : purchase.player?.role === "C"
-                                      ? "bg-blue-200"
-                                      : purchase.player?.role === "A"
-                                        ? "bg-red-200"
-                                        : "bg-gray-50"
-                              }`}
-                            >
-
-                              <div className="flex min-w-0 items-center gap-3">
-
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-gray-500">
-                                  {index + 1}
-                                </span>
-
-                                <div className="min-w-0">
-                                  <p className="truncate font-medium text-gray-900">
-                                    {purchase.player?.name ?? "Giocatore"}
+                              return (
+                                <div
+                                  key={role}
+                                  className={`rounded-lg p-2 text-center ${roleColors[role]}`}
+                                >
+                                  <p className="text-xs font-bold text-gray-600">
+                                    {role}
                                   </p>
 
-                                  <p className="text-xs text-gray-600">
-                                    {purchase.player?.team ??
-                                      "Squadra non disponibile"}
-                                    {" · "}
-                                    {purchase.player?.role ?? "-"}
+                                  <p className="mt-1 font-bold text-gray-900">
+                                    {getRoleCount(
+                                      participant.id,
+                                      role
+                                    )}
                                   </p>
                                 </div>
+                              )
+                            }
+                          )}
+                        </div>
 
-                              </div>
+                        {/* Crediti */}
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">
+                              Spesi
+                            </p>
 
-                              <div className="flex shrink-0 items-center gap-2">
+                            <p className="mt-1 font-bold text-gray-900">
+                              {spentCredits}
+                            </p>
+                          </div>
 
-                                <p className="font-bold text-gray-900">
-                                  {purchase.price}
-                                </p>
+                          <div className="rounded-lg bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">
+                              Budget iniziale
+                            </p>
 
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    deletePurchase(purchase.id)
-                                  }
-                                  disabled={
-                                    deletingPurchaseId ===
-                                    purchase.id
-                                  }
-                                  className="rounded-lg bg-white px-2 py-1 text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                  title="Elimina acquisto"
-                                >
-                                  {deletingPurchaseId ===
-                                  purchase.id
-                                    ? "..."
-                                    : "🗑️"}
-                                </button>
-
-                              </div>
-
-                            </div>
-                          )
-                        )}
-
+                            <p className="mt-1 font-bold text-gray-900">
+                              {participant.initial_credits}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                </section>
-              )
-            })}
+                      {/* Rosa */}
+                      <div className="p-4 sm:p-5">
+                        <h4 className="font-semibold text-gray-900">
+                          Rosa
+                        </h4>
 
-          </div>
-        </section>
-      </>
-    )}
-  </div>
-</main>
+                        {participantPurchases.length === 0 ? (
+                          <p className="mt-4 text-sm text-gray-500">
+                            Nessun giocatore acquistato.
+                          </p>
+                        ) : (
+                          <div className="mt-4 space-y-2 sm:space-y-3">
+                            {participantPurchases.map(
+                              (purchase, index) => (
+                                <div
+                                  key={purchase.id}
+                                  className={`flex min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-100 p-3 sm:gap-3 ${
+                                    purchase.player?.role === "P"
+                                      ? "bg-orange-200"
+                                      : purchase.player?.role === "D"
+                                        ? "bg-green-200"
+                                        : purchase.player?.role === "C"
+                                          ? "bg-blue-200"
+                                          : purchase.player?.role === "A"
+                                            ? "bg-red-200"
+                                            : "bg-gray-50"
+                                  }`}
+                                >
+                                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-gray-500">
+                                      {index + 1}
+                                    </span>
 
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium text-gray-900 sm:text-base">
+                                        {purchase.player?.name ??
+                                          "Giocatore"}
+                                      </p>
 
-)
+                                      <p className="truncate text-xs text-gray-600">
+                                        {purchase.player?.team ??
+                                          "Squadra non disponibile"}
+                                        {" · "}
+                                        {purchase.player?.role ?? "-"}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                                    <p className="text-sm font-bold text-gray-900 sm:text-base">
+                                      {purchase.price}
+                                    </p>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        deletePurchase(
+                                          purchase.id
+                                        )
+                                      }
+                                      disabled={
+                                        deletingPurchaseId ===
+                                        purchase.id
+                                      }
+                                      className="rounded-lg bg-white px-2.5 py-2 text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                      title="Elimina acquisto"
+                                    >
+                                      {deletingPurchaseId ===
+                                      purchase.id
+                                        ? "..."
+                                        : "🗑️"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+    </main>
+  )
 }
