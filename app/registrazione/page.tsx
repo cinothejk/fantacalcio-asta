@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
+import Image from "next/image"
 
 export default function RegistrazionePage() {
   const router = useRouter()
@@ -55,10 +56,19 @@ export default function RegistrazionePage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
 
         <div className="mb-8 text-center">
-          <div className="mb-3 text-4xl">⚽</div>
+          <div className="mb-6 flex justify-center">
+            <Image
+              src="/logo.png"
+              alt="Fantacalcio"
+              width={160}
+              height={160}
+              priority
+            />
+          </div>
 
           <h1 className="text-2xl font-bold text-gray-900">
-            Crea il tuo account
+            Registrati a Fantacalcio Asta
+            Registrati a Fant Aste e Co.
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">

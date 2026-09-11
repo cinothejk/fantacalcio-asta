@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase/client"
+import Image from "next/image"
 
 type Auction = {
   id: string
@@ -128,9 +129,21 @@ async function createAuction() {
       <div className="mx-auto max-w-5xl px-6 py-10">
 
         <header className="mb-10">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-            ⚽ Fantacalcio Asta
-          </h1>
+
+          <div className="flex items-center gap-3">
+  <Image
+    src="/logo.png"
+    alt="Fantacalcio"
+    width={64}
+    height={64}
+    priority
+    className="object-contain"
+  />
+
+  <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+    Fantacalcio Asta
+  </h1>
+</div>
 
           <p className="mt-2 text-gray-600">
             Gestisci le tue aste di fantacalcio

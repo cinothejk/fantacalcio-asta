@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
-
+import Image from "next/image"
 
 
 const menuItems = [
@@ -88,11 +88,19 @@ useEffect(() => {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-6 py-3">
 
         <Link
-          href="/"
-          className="mr-4 text-lg font-bold text-gray-900"
-        >
-          ⚽ Fantacalcio
-        </Link>
+  href="/"
+  className="mr-4 flex items-center gap-2 text-lg font-bold text-gray-900"
+>
+  <Image
+    src="/logo.png"
+    alt="Fantacalcio"
+    width={40}
+    height={40}
+    className="object-contain"
+  />
+
+  <span>Fantacalcio</span>
+</Link>
 
         {auctionName && (
   <div className="mr-4 hidden items-center gap-2 text-sm sm:flex">
