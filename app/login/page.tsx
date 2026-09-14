@@ -15,24 +15,32 @@ const [loading, setLoading] = useState(false)
 const [error, setError] = useState("")
 
 async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
-event.preventDefault()
+  event.preventDefault()
 
 
-setLoading(true)
-setError("")
+  setLoading(true)
+  setError("")
 
-const { error } = await supabase.auth.signInWithPassword({
-  email,
-  password,
-})
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
-if (error) {
-  setError("Email o password non corretti.")
-  setLoading(false)
-  return
-}
+  if (error) {
+    //setError("Email o password non corretti.")
+    if (error.code === "email_not_confirmed") {
+        setError("Email non verificata, accedi alla tua mailbox e verifica la tua email cliccando sul link di verifica.")
+    } else if (error.code === "invalid_credentials") {
+        setError("Email o password non corretti.")
+    } else {
+        setError(error.message)
+    }
+      
+    setLoading(false)
+    return
+  }
 
-router.replace("/")
+  router.replace("/")
 
 
 }

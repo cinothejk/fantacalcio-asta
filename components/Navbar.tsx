@@ -46,6 +46,7 @@ export default function Navbar() {
 
   const [auctionName, setAuctionName] = useState("")
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     async function loadAuctionName() {
@@ -71,6 +72,22 @@ export default function Navbar() {
 
     loadAuctionName()
   }, [auctionId])
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const { data, error } = await supabase.rpc("is_admin")
+
+      if (error) {
+        console.error(error)
+        setIsAdmin(false)
+        return
+      }
+
+      setIsAdmin(data === true)
+    }
+
+    checkAdmin()
+  }, [])
 
   useEffect(() => {
     setMenuOpen(false)
@@ -149,6 +166,19 @@ export default function Navbar() {
               )
             })}
 
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  pathname === "/admin"
+                    ? "bg-red-600 text-white"
+                    : "text-red-600 hover:bg-red-50"
+                }`}
+              >
+                Admin
+              </Link>
+            )}
+
             <button
               onClick={handleLogout}
               className="ml-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
@@ -208,6 +238,19 @@ export default function Navbar() {
                   </Link>
                 )
               })}
+
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`rounded-lg px-4 py-3 text-sm font-medium transition ${
+                    pathname === "/admin"
+                      ? "bg-red-600 text-white"
+                      : "text-red-600 hover:bg-red-50"
+                  }`}
+                >
+                  Admin
+                </Link>
+              )}
 
               <button
                 onClick={handleLogout}
