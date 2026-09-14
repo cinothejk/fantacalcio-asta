@@ -204,7 +204,7 @@ export default function AdminPage() {
 </div>
 
 <p className="mb-3 text-sm text-gray-500">
-  Visualizzati {filteredUsers.length} di {users.length} utenti
+  Visualizzati {filteredUsers.length} di {users.length} utentis
 </p>
 
         <div className="space-y-3">
