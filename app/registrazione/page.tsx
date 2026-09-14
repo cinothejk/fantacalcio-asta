@@ -6,8 +6,9 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import Image from "next/image"
+import { Suspense } from "react"
 
-export default function RegistrazionePage() {
+function RegistrazioneContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const status = searchParams.get("status")
@@ -294,3 +295,10 @@ export default function RegistrazionePage() {
   )
 }
 
+export default function RegistrazionePage() {
+  return (
+    <Suspense fallback={null}>
+      <RegistrazioneContent />
+    </Suspense>
+  )
+}
