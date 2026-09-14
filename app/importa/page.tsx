@@ -143,58 +143,51 @@ export default function ImportaPage() {
   }
 
   async function handleImport() {
-    if (players.length === 0) {
-      return
-    }
-
-    setImporting(true)
-    setImportResult("")
-    setError("")
-
-    try {
-      const rows = players.map((player) => ({
-        external_id: player.external_id,
-        name: player.name,
-        out_of_list: player.out_of_list,
-        team: player.team,
-        under: player.under,
-        role: player.role,
-        mantra_role: player.mantra_role,
-        pgv: player.pgv,
-        mv: player.mv,
-        fm: player.fm,
-        fvm_1000: player.fvm_1000,
-        quotation: player.quotation,
-        fantasquadra: player.fantasquadra,
-        cost: player.cost,
-        status: "available",
-      }))
-
-      const { error } = await supabase
-        .from("players")
-        .upsert(rows, {
-          onConflict: "external_id",
-        })
-
-      if (error) {
-        throw error
-      }
-
-      setImportResult(
-        `${players.length} giocatori importati correttamente.`
-      )
-    } catch (err) {
-      console.error(err)
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Errore durante l'importazione."
-      )
-    } finally {
-      setImporting(false)
-    }
+  if (players.length === 0) {
+    return
   }
+
+  setImporting(true)
+  setImportResult("")
+  setError("")
+
+  try {
+    const { data, error } = await supabase.rpc(
+      "import_players_diff",
+      {
+        p_players: players,
+      }
+    )
+
+    if (error) {
+      throw error
+    }
+
+    const result = data as {
+      inserted: number
+      updated: number
+      deleted: number
+      out_of_list: number
+    }
+
+    setImportResult(
+      `Importazione completata: ${result.inserted} nuovi, ` +
+      `${result.updated} aggiornati, ` +
+      `${result.deleted} eliminati, ` +
+      `${result.out_of_list} fuori lista.`
+    )
+  } catch (err) {
+    console.error(err)
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Errore durante l'importazione."
+    )
+  } finally {
+    setImporting(false)
+  }
+}
 
   return (
     <main className="min-h-screen bg-gray-100">
